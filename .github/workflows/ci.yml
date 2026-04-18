@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: MIT
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate-html:
+    name: HTML Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate HTML
+        # vnu (Nu Html Checker) validates src/index.html against W3C HTML5 spec.
+        # Install via npm wrapper; fail on any error (warnings are reported but do not fail).
+        run: |
+          npm install -g vnu-jar
+          vnu --errors-only src/index.html
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Run unit tests
+        run: node tests/unit/run.js
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Run Playwright tests
+        run: npx playwright test

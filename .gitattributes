@@ -1,0 +1,26 @@
+# Normalize all text files to LF on commit.
+# This ensures the repository always stores LF line endings
+# regardless of the OS used to commit.
+
+* text=auto eol=lf
+
+# Explicitly LF for all source and doc types
+*.html text eol=lf
+*.css text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.txt text eol=lf
+*.gitignore text eol=lf
+*.gitattributes text eol=lf
+
+# Binary files — no line ending conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

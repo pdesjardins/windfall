@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node (Playwright, validators)
+node_modules/
+package-lock.json
+
+# Playwright
+playwright-report/
+test-results/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Save files (player data, not source)
+windfall-save*.json
