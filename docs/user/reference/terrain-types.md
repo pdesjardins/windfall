@@ -1,63 +1,62 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Terrain Types Reference
 
-Every hex on the Windfall map has a terrain type. Terrain type determines which units can enter the hex, what can be built there, and what strategic advantages it provides.
+Every hex on the Windfall map has a terrain type. Terrain type determines which units can enter the hex, what improvements can be built there, and what strategic advantages it provides.
 
 ## Terrain Types
 
-| Terrain | Navigable By | Can Be Improved | Special Properties |
+| Terrain | Navigable By | Possible Improvements | Special Properties |
 |---|---|---|---|
-| Ocean | Ships | No | Standard naval movement |
-| Coast | Ships, Crew | No | Crew may embark and disembark ships here |
-| Plains | Crew | No | Standard land movement |
-| Forest | Crew | Yes → Logging Camp | Logging camp enables ship production at nearby fortifications |
-| Farmland | Crew | Yes → Farm | Farm enables crew production at nearby fortifications |
-| Stone | Crew | No | Defensive bonus for adjacent or enclosing fortifications |
-| Mountain | Neither | No | Impassable; acts as a natural fortification wall |
+| Ocean | Ships | None | Open water |
+| Coast | Ships | None | Crew embark and disembark across the coast-to-land boundary |
+| Grassland | Crew | Farm or Wall | Most common land type |
+| Forest | Crew | Logging Camp or Wall | |
+| Stone | Crew | Wall only | Stone walls grant a defensive bonus |
+| Mountain | Neither | None | Impassable; acts as a natural wall segment |
+
+## One Improvement Per Hex
+
+Each land hex may hold exactly one improvement. Choosing to build a wall on a grassland hex means that hex can no longer become a farm. Choosing to build a logging camp on a forest hex means it can no longer become a wall. These choices are permanent for the duration of the game.
 
 ## Terrain Detail
 
 ### Ocean
 
-Open water. Ships move freely. Crew cannot enter ocean hexes except by embarking onto a ship at a coast hex.
+Open water. Ships move freely. Crew cannot enter ocean hexes.
 
 ### Coast
 
-The boundary between sea and land. Ships can anchor at coast hexes. Crew can board a ship at a coast hex or disembark from a ship onto one. Coast hexes adjacent to a live fortification enable ship production if a logging camp is within range.
+Water hexes adjacent to land. Ships navigate coast hexes. Crew cross the boundary between a coast hex and an adjacent land hex to board or leave a ship. Coast hexes themselves cannot be improved.
 
-### Plains
+### Grassland
 
-Standard land terrain. Crew move through plains at normal movement cost. No special properties.
+Open grassy terrain. The most common land type. Crew move through grassland at normal movement cost. A grassland hex can be improved into a farm (enabling crew production at nearby fortifications) or a wall segment (contributing to a fortification).
 
 ### Forest
 
-Forested land. Crew can improve a forest hex into a logging camp. A logging camp within 3 hexes of a live fortification that is also adjacent to a coast hex enables that fortification to produce ships.
-
-### Farmland
-
-Agricultural land. Crew can improve a farmland hex into a farm. A farm within 3 hexes of a live fortification enables that fortification to produce crew.
+Forested land. A forest hex can be improved into a logging camp (enabling ship production at nearby fortifications) or a wall segment. Choosing one precludes the other.
 
 ### Stone
 
-Rocky, mountainous terrain that crew can enter but not build walls on. Stone hexes adjacent to or enclosed within a fortification increase its defensive rating, reducing incoming cannon damage.
+Rocky terrain that crew can enter. Stone hexes can only be improved into wall segments — they cannot become farms or logging camps. Wall segments built on stone hexes grant the enclosing fortification a defensive bonus, reducing incoming cannon damage. This bonus comes from the stone material itself.
 
 ### Mountain
 
-High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as natural fortification walls — they can close off gaps in a wall line, reducing the number of wall segments a player must build.
+High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as natural wall segments — a chain of fortification walls can connect through mountains without requiring crew to build there.
 
-## Improvements
+## Improvements Summary
 
-Two terrain types can be improved by crew actions:
-
-| Base Terrain | Improvement | Turns Required | Effect |
-|---|---|---|---|
-| Forest | Logging Camp | TBD | Enables ship production at nearby fortifications |
-| Farmland | Farm | TBD | Enables crew production at nearby fortifications |
-
-Improvements are permanent for the duration of the game. Any player's fortification within range benefits from an improvement, regardless of who built it — so defending improved terrain has strategic value.
+| Base Terrain | Improvement | Effect |
+|---|---|---|
+| Grassland | Farm | Enables crew production at fortifications within 3 hexes |
+| Grassland | Wall | Contributes to a fortification; standard defensive rating |
+| Forest | Logging Camp | Enables ship production at fortifications within 3 hexes |
+| Forest | Wall | Contributes to a fortification; standard defensive rating |
+| Stone | Wall | Contributes to a fortification; enhanced defensive rating |
 
 ## Related Topics
 
 - [Fortifications](../concepts/fortifications.md)
 - [Crew and Ships](../concepts/units.md)
 - [Fog of War](../concepts/fog-of-war.md)
+- [Glossary](glossary.md)

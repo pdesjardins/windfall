@@ -32,6 +32,9 @@ src/
       input.js        ← mouse/keyboard event handling
       hud.js          ← heads-up display and UI panels
       dialogs.js      ← modal dialogs and overlays
+      locale/           ← string resources (one file per language)
+        en.js           ← English strings (default)
+      settings.js       ← key binding configuration and defaults
 ```
 
 **Engine modules must not import from `ui/`.** UI modules may import from `engine/`. This boundary is enforced by linting.
@@ -71,6 +74,40 @@ All hex coordinate math must use the canonical axial coordinate system documente
 - The game map is approximately 120×80 hexes (~9,600 tiles). All operations on the full map must complete within a single frame (16ms) or be explicitly deferred.
 - Terrain generation runs once at game start and may take up to 2 seconds.
 - Rendering is canvas-based. Do not manipulate individual DOM elements per hex.
+
+## Localization
+
+Windfall is localization-ready. All user-visible strings are externalized to locale files. No string literals may appear in UI code.
+
+- All strings live in `src/js/locale/en.js` (or the appropriate language file).
+- UI modules import strings from the active locale module. They never contain raw string literals.
+- The active locale is loaded once at initialization and passed to UI modules.
+- CI will lint for raw string literals in `src/js/ui/` files.
+
+**RTL layout support:** All CSS must use logical properties rather than physical directional properties:
+
+| Do not use | Use instead |
+|---|---|
+| `margin-left`, `margin-right` | `margin-inline-start`, `margin-inline-end` |
+| `padding-left`, `padding-right` | `padding-inline-start`, `padding-inline-end` |
+| `left`, `right` (in positioning) | `inset-inline-start`, `inset-inline-end` |
+| `border-left`, `border-right` | `border-inline-start`, `border-inline-end` |
+| `text-align: left` | `text-align: start` |
+
+The `dir` attribute on `<html>` controls layout direction. RTL languages work automatically when logical properties are used consistently.
+
+**Canvas text:** Text rendered directly to the canvas is not covered by CSS logical properties. Canvas text must be handled separately if RTL support for canvas-rendered content is required in future.
+
+**Number and unit formatting:** Windfall uses archaic and imperial units intentionally (distances, durations). These are defined as strings in the locale file and require no numeric formatting API.
+
+## Keyboard Accessibility
+
+The hex map must be navigable by keyboard. See `docs/internal/architecture/overview.md` for the key binding system design and `docs/user/reference/keybindings.md` for the default bindings.
+
+- The canvas element must be focusable (`tabindex="0"`).
+- Key events on the focused canvas drive hex cursor movement.
+- All canvas interactions available by mouse must also be available by keyboard.
+- Key bindings are defined in `src/js/settings.js` and are user-customizable.
 
 ## Save Files
 

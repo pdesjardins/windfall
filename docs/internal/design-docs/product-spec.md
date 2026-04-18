@@ -13,7 +13,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 - **Exploration as the primary experience.** The early game is about sailing an unknown world, reading its coastlines, and finding the right terrain to build on. Discovery should feel rewarding.
 - **Simple rules, meaningful decisions.** All crew are identical. All ships are identical. Complexity comes from terrain, positioning, and timing — not from unit differentiation or resource micromanagement.
-- **Abstracted, not realistic.** Production of crew and ships happens near farmland and forests without explicit resource counting. Being near the right terrain is sufficient. Exact quantities are tunable constants, not emergent from supply chains.
+- **Abstracted, not realistic.** Production of crew and ships happens near grassland and forests without explicit resource counting. Being near the right terrain is sufficient. Exact quantities are tunable constants, not emergent from supply chains.
 - **Long sessions with save/resume.** A full game may span multiple real-world sessions. Players should be able to stop, think about their situation, and return.
 - **Tribute to early Civilization.** Fog of war, turn-based movement, fortification building, and terrain-based strategy are deliberate homages to that design tradition.
 
@@ -33,20 +33,21 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 - Hex grid using axial coordinates, approximately 120×80 hexes (~9,600 total).
 - Procedurally generated using multi-octave noise. Each game produces a unique map.
-- A water level threshold floods the terrain, producing a pattern of ocean and land with natural coastlines.
+- A heightmap is generated and used to classify terrain types, then discarded. Elevation is a generation-time tool only — it has no role in gameplay or rendering after classification.
+- Two elevation thresholds are applied: a water threshold (below → ocean/coast) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone.
+- All non-ocean, non-mountain hexes are rendered as flat. No elevation differences between land hexes are depicted or acknowledged.
 - The human player and AI player start on opposite sides of the map, far enough apart that early contact requires deliberate exploration.
 
 ### Terrain Types
 
 | Terrain | Navigable By | Notes |
 |---|---|---|
-| Ocean | Ships | Standard naval movement |
-| Coast | Ships, Crew (deploy/embark) | Transition zone between sea and land |
-| Plains | Crew | Standard land movement |
-| Forest | Crew | Can be improved into a logging camp |
-| Farmland | Crew | Can be improved into a farm |
-| Stone | Crew | Defensive bonus for adjacent fortifications |
-| Mountain | Neither | Impassable; acts as natural fortification wall |
+| Ocean | Ships | Open water; standard naval movement |
+| Coast | Ships | Water hex adjacent to land; crew embark/disembark across coast-to-land boundary |
+| Grassland | Crew | Standard land movement; can be improved into a farm or wall |
+| Forest | Crew | Can be improved into a logging camp or wall |
+| Stone | Crew | Can be improved into a wall; stone walls provide a defensive bonus |
+| Mountain | Neither | Impassable; acts as a natural wall segment |
 
 ### Fog of War
 
@@ -75,9 +76,9 @@ Crew are the player's land-based units. All crew are identical in capability.
 **Capabilities:**
 - Navigate land hexes (costs 1 turn per hex, standard terrain)
 - Sail a ship (requires at least 1 crew aboard)
-- Build fortification wall segments (5 turns per wall hex)
-- Improve forest into logging camp (cost TBD by testing)
-- Improve farmland into farm (cost TBD by testing)
+- Improve a land hex into a wall segment (5 turns; valid on grassland, forest, stone)
+- Improve grassland into farm (cost TBD by testing; mutually exclusive with wall)
+- Improve forest into logging camp (cost TBD by testing; mutually exclusive with wall)
 - Fight enemy crew (combat resolution TBD)
 - Pick up, carry, and hide the player's flag
 - Capture the enemy's flag by moving onto its hex
@@ -98,10 +99,10 @@ All ships are identical. A ship retains full capability until destroyed.
 - Navigate ocean and coast hexes
 - Transport crew (capacity TBD; initial value: 6 crew)
 - Fire cannons at enemy ships and fortifications within range (range TBD; initial value: 2 hexes)
-- Deploy crew to adjacent coast hexes
-- Embark crew from adjacent coast hexes
+- Deploy crew to an adjacent land hex that borders a coast hex
+- Embark crew from an adjacent shore-adjacent land hex
 
-**Production:** Ships are produced by a live fortification that is adjacent to a coast hex and within 3 hexes of an improved forest (logging camp). Production requires a fixed number of turns (TBD; initial value: 10 turns).
+**Production:** Ships are produced by a live fortification that contains a shore-adjacent wall hex and is within 3 hexes of a logging camp. The produced ship appears on an adjacent coast hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
 
 **Destruction:** A ship destroyed in combat is removed from the game permanently. Crew aboard a destroyed ship are also lost.
 
@@ -109,30 +110,50 @@ All ships are identical. A ship retains full capability until destroyed.
 
 ## Fortifications
 
-Fortifications are not placed as single units. They are constructed incrementally and emerge when crew enclose a region.
+Fortifications are constructed wall segment by wall segment and go live when the wall forms a closed loop.
+
+### Improvements and Mutual Exclusivity
+
+A wall segment is an improvement applied to a land hex. Each hex may hold exactly one improvement:
+
+| Hex Type | Possible Improvements |
+|---|---|
+| Grassland | Farm **or** Wall |
+| Forest | Logging Camp **or** Wall |
+| Stone | Wall only |
+| Mountain | Natural wall — no improvement required or possible |
+| Coast | None (water hex) |
+| Ocean | None (water hex) |
 
 ### Construction
 
-1. A crew unit stops on a land hex and spends 5 turns building.
-2. After 5 turns, that hex becomes a **fortification wall** segment.
+1. A crew unit stops on a grassland, forest, or stone hex and spends 5 turns building.
+2. After 5 turns, that hex becomes a **wall** improvement, replacing any prior improvement on that hex.
 3. The crew unit may then move to an adjacent hex and repeat.
-4. When wall segments (plus any natural barriers: mountains, map edges, coastlines) completely enclose one or more interior hexes, those interior hexes become a **live fortification**.
+4. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fortification**.
 
-Flood-fill from outside the map boundary determines enclosure. Any contiguous region of interior hexes fully bounded by wall segments or natural barriers becomes live.
+Mountain hexes participate as natural wall segments without requiring any improvement. The closed-loop detection replaces the prior flood-fill model.
+
+### Embarkation at Fortified Shore
+
+- **Friendly fortification:** crew may embark and disembark freely across shore-adjacent wall hexes (gates are assumed).
+- **Enemy fortification:** crew may not disembark onto a shore-adjacent enemy wall hex; the fort fires on approaching units.
 
 ### Live Fortification Capabilities
 
 | Capability | Condition |
 |---|---|
 | Fire cannons | Automatically fires at enemy units within 2 hexes at end of player turn |
-| Generate crew | Improved farmland (farm) within 3 hexes |
-| Generate ships | Improved forest (logging camp) within 3 hexes AND adjacent coast hex |
+| Generate crew | Farm within 3 hexes |
+| Generate ships | Logging camp within 3 hexes AND fortification contains a shore-adjacent wall hex |
 | Accept captured flag | Any live fortification belonging to the flag carrier's player |
 | Store hidden flag | Any live fortification belonging to the owning player |
 
-### Terrain Bonuses
+When a ship is generated, it appears as a unit on an adjacent coast hex.
 
-- **Stone hexes** adjacent to or enclosed within a fortification increase its defensive rating (damage reduction TBD).
+### Stone Wall Bonus
+
+Wall segments built on stone hexes increase the fortification's defensive rating (damage reduction TBD). Stone provides the bonus because of the material, not merely its location — only stone wall hexes confer this benefit.
 
 ---
 
@@ -182,7 +203,7 @@ The initial AI is intentionally simple. Sophistication will increase in later it
 
 **Phase 2 — Expansion:**
 - AI allocates crew and ships on a fixed turn schedule (TBD).
-- AI builds fortifications near favorable terrain (stone, coast, farmland, forest).
+- AI builds fortifications near favorable terrain (stone, coast, grassland, forest).
 - AI moves ships to explore the map.
 
 **Phase 3 — Aggression:**
@@ -237,3 +258,9 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-18 | Save to JSON file download | No backend required; works on any static host |
 | 2026-04-18 | AI mirrors player starting conditions | Makes AI feel like a true opponent; enables symmetric gameplay |
 | 2026-04-18 | Farms/logging camps within distance, not enclosed | Removes supply chain complexity; proximity is sufficient |
+| 2026-04-18 | Collapsed "plains" and "farmland" into "grassland" | Simpler and more consistent — Forest→Logging Camp and Grassland→Farm follow the same pattern; separate "farmland" type was redundant |
+| 2026-04-18 | Elevation discarded after terrain classification | A 2D hex grid cannot meaningfully depict inter-hex elevation differences; terrain type carries all visual and strategic meaning; mountains signal impassable high terrain without runtime elevation data |
+| 2026-04-18 | Wall is a hex improvement, not a placed unit | Consistent with farm/logging camp model; one improvement per hex; stone walls give defensive bonus from the material, not adjacency |
+| 2026-04-18 | Fortification goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
+| 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary |
+| 2026-04-18 | Friendly forts allow embarkation at shore-adjacent wall hexes | Gates are assumed; enemy forts fire on approaching units and block disembarkation |

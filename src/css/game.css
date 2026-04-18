@@ -1,0 +1,123 @@
+/* SPDX-License-Identifier: MIT */
+
+/* ── Top bar ── */
+
+#top-bar {
+  display: flex;
+  align-items: center;
+  padding-inline: 1rem;
+  block-size: 38px;
+  background-color: #111820;
+  border-block-end: 1px solid #2a3a44;
+  flex-shrink: 0;
+}
+
+#game-title {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #e8d5b0;
+  white-space: nowrap;
+}
+
+#game-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-inline-start: auto;
+}
+
+/* ── Game area: canvas + side panel ── */
+
+#game-area {
+  display: grid;
+  grid-template-columns: 1fr 220px;
+  overflow: hidden;
+  flex: 1;
+  min-block-size: 0;
+}
+
+#canvas-container {
+  position: relative;
+  background-color: #000;
+  overflow: hidden;
+}
+
+#game-canvas {
+  display: block;
+  inline-size: 100%;
+  block-size: 100%;
+}
+
+/* ── Side panel ── */
+
+#info-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem;
+  background-color: #0d1520;
+  border-inline-start: 1px solid #2a3a44;
+  overflow-y: auto;
+}
+
+#turn-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block-end: 0.75rem;
+  border-block-end: 1px solid #2a3a44;
+}
+
+#turn-counter {
+  font-size: 0.8rem;
+  color: #7a9aa8;
+  letter-spacing: 0.05em;
+}
+
+.panel-heading {
+  padding-block-end: 0.3rem;
+  border-block-end: 1px solid #2a3a44;
+}
+
+.placeholder-text {
+  font-size: 0.8rem;
+  color: #4a6070;
+  font-style: italic;
+}
+
+/* ── Buttons ── */
+
+.action-btn {
+  padding-block: 0.25rem;
+  padding-inline: 0.75rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  letter-spacing: 0.04em;
+  color: #c8b89a;
+  background-color: #1a2a36;
+  border: 1px solid #2a3a44;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s;
+}
+
+.action-btn:hover:not(:disabled) {
+  background-color: #243444;
+  border-color: #4a7a8a;
+}
+
+.action-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#btn-end-turn {
+  color: #e8d5b0;
+  border-color: #4a6a5a;
+}
+
+#btn-end-turn:hover:not(:disabled) {
+  background-color: #1a3028;
+  border-color: #5a8a6a;
+}

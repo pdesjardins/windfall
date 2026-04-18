@@ -1,0 +1,51 @@
+/* SPDX-License-Identifier: MIT */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  block-size: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 16px;
+  background-color: #0a0e14;
+  color: #c8b89a;
+}
+
+h1 {
+  font-size: 1.5rem;
+  font-weight: normal;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: #e8d5b0;
+}
+
+h2 {
+  font-size: 0.75rem;
+  font-weight: normal;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #7a9aa8;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  block-size: 100vh;
+}

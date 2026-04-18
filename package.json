@@ -1,0 +1,18 @@
+{
+  "name": "windfall",
+  "version": "0.1.0",
+  "description": "A turn-based nautical strategy game of exploration and capture-the-flag.",
+  "license": "MIT",
+  "author": "Peter Desjardins",
+  "private": true,
+  "scripts": {
+    "test:unit": "node tests/unit/run.js",
+    "test:e2e": "playwright test",
+    "test": "node tests/unit/run.js && playwright test",
+    "serve": "npx serve src --listen 3000"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.44.0",
+    "serve": "^14.2.0"
+  }
+}

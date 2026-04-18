@@ -11,9 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
       - name: Validate HTML
-        # vnu (Nu Html Checker) validates src/index.html against W3C HTML5 spec.
-        # Install via npm wrapper; fail on any error (warnings are reported but do not fail).
         run: |
           npm install -g vnu-jar
           vnu --errors-only src/index.html
@@ -37,7 +38,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
-      - name: Install Playwright
+      - name: Install dependencies
+        run: npm install
+      - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
       - name: Run Playwright tests
         run: npx playwright test
