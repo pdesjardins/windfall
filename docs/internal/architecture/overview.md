@@ -42,6 +42,9 @@ src/
     locale/               ← string resources; one module per language
       en.js               ← English strings (default; only language currently)
     settings.js           ← key binding defaults and user configuration
+  assets/
+    terrain/              ← SVG files for terrain hex rendering (one per terrain type)
+    sprites/              ← PNG files for unit and flag sprites
 ```
 
 ---
@@ -52,7 +55,7 @@ Windfall uses an **axial coordinate system** (q, r) on a flat-top hex grid.
 
 **Canonical reference:** [redblobgames.com/grids/hexagons](https://www.redblobgames.com/grids/hexagons/) — all hex math must follow this reference. Do not invent alternative representations.
 
-**Map dimensions:** approximately 120 columns × 80 rows (~9,600 hexes). Exact dimensions are configurable constants in `hex.js`.
+**Map dimensions:** approximately 200 columns × 150 rows (~30,000 hexes). Exact dimensions are configurable constants in `hex.js`. Viewport culling ensures only visible hexes are rendered each frame.
 
 **Neighbor directions** (flat-top axial):
 ```
@@ -186,6 +189,41 @@ AI sophistication is intentionally limited in the initial implementation. The AI
 
 ---
 
+## Graphics and Assets
+
+Windfall uses a hybrid asset strategy:
+
+**Terrain hexes — SVG**
+Each terrain type has a dedicated SVG file in `src/assets/terrain/`. SVGs are loaded at startup, rasterized to an offscreen canvas at the current hex render size, and cached. Resizing the game window triggers a re-rasterization pass. This approach scales cleanly to any hex size and makes terrain skins trivially swappable — replacing a terrain type means replacing one SVG file.
+
+| Terrain Type | Asset File |
+|---|---|
+| Ocean | `terrain/ocean.svg` |
+| Coast | `terrain/coast.svg` |
+| Grassland | `terrain/grassland.svg` |
+| Forest | `terrain/forest.svg` |
+| Stone | `terrain/stone.svg` |
+| Mountain | `terrain/mountain.svg` |
+
+Fog states (explored, undiscovered) are applied as canvas compositing operations over the terrain SVG, not as separate assets.
+
+**Sprites — PNG**
+Crew, ships, and flags are PNG sprites in `src/assets/sprites/`. PNGs are authored at a fixed base resolution and scaled to fit the hex size at render time. A sprite sheet is not required initially — individual files per unit type are acceptable until the sprite count makes a sheet worthwhile.
+
+| Unit | Asset File |
+|---|---|
+| Crew (player) | `sprites/crew-player.png` |
+| Crew (AI) | `sprites/crew-ai.png` |
+| Ship (player) | `sprites/ship-player.png` |
+| Ship (AI) | `sprites/ship-ai.png` |
+| Flag (player) | `sprites/flag-player.png` |
+| Flag (AI) | `sprites/flag-ai.png` |
+
+**Skinning**
+Swapping all terrain SVGs and sprite PNGs constitutes a complete visual skin. No code changes are required to change the visual theme. This makes designer contribution straightforward — assets are self-contained files with no build pipeline dependency.
+
+---
+
 ## Localization
 
 All user-visible strings are externalized to `src/js/locale/en.js`. No raw string literals appear in UI code. The active locale module is loaded at initialization and injected into UI modules.
@@ -275,6 +313,12 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-18 | JSON save to file download | No backend required; works with static hosting |
 | 2026-04-18 | Wall is a hex improvement (one per hex) | Consistent with farm/logging camp model; stone walls grant defensive bonus from material |
 | 2026-04-18 | Elevation discarded after terrain classification | 2D hex grid cannot depict inter-hex elevation differences meaningfully; terrain type carries all visual and strategic meaning; heightmap is a generation tool only — not stored in save files |
+| 2026-04-19 | Map size 200×150 (~30,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
+| 2026-04-19 | Wind drives ship AP via points of sail (1–3) | Authentic nautical mechanic encoded in engine; wind direction is global map state |
+| 2026-04-19 | Attack is implicit movement; no explicit attack command | Moving onto enemy hex triggers combat; simplifies input model |
+| 2026-04-19 | Cannon range constant at 1 hex | No range tracking needed; walls auto-fire; ships spend 1 AP |
+| 2026-04-19 | Two-tier fortification model | Tier 1 (any wall) fires cannons; Tier 2 (enclosed) unlocks production and flag win |
+| 2026-04-18 | SVG for terrain hexes, PNG for sprites | SVG scales to any hex size without quality loss; easy to swap for skinning; PNG is the natural format for detailed unit sprites and what designers expect |
 | 2026-04-18 | Localization via externalized string modules | No raw strings in UI code; RTL support via CSS logical properties; English only currently but architecture is translation-ready |
 | 2026-04-18 | QWEASDZXC default hex navigation keys | 3×3 key block mirrors hex geometry; 6 direction keys + wait; W and X unassigned; bindings are user-customizable via localStorage |
 | 2026-04-18 | Closed-loop detection replaces flood-fill enclosure | Simpler and more accurate to design intent; mountains participate as natural segments |

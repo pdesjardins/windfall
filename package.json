@@ -5,6 +5,7 @@
   "license": "MIT",
   "author": "Peter Desjardins",
   "private": true,
+  "type": "module",
   "scripts": {
     "test:unit": "node tests/unit/run.js",
     "test:e2e": "playwright test",
