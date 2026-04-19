@@ -1,0 +1,51 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Windfall — a turn-based nautical strategy game of exploration and capture-the-flag.">
+  <title>Windfall</title>
+  <link rel="stylesheet" href="css/main.css">
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+  <div id="app">
+    <header id="top-bar">
+      <span id="game-title">Windfall</span>
+      <nav id="game-controls">
+        <button class="action-btn" id="btn-new-game" type="button">New Game</button>
+        <button class="action-btn" id="btn-save" type="button" disabled>Save Game</button>
+        <button class="action-btn" id="btn-load" type="button">Load Game</button>
+      </nav>
+    </header>
+
+    <div id="game-area">
+      <main id="canvas-container">
+        <canvas id="game-canvas" aria-label="Game map">
+          Your browser does not support the HTML canvas element required to play Windfall.
+        </canvas>
+      </main>
+
+      <aside id="info-panel">
+        <div id="turn-controls">
+          <div id="turn-counter">Turn: <span id="turn-number">—</span></div>
+          <button class="action-btn" id="btn-end-turn" type="button" disabled>End Turn</button>
+        </div>
+
+        <h2 class="panel-heading">Selected Unit</h2>
+        <div id="unit-info">
+          <p class="placeholder-text">No unit selected.</p>
+        </div>
+
+        <h2 class="panel-heading">Status</h2>
+        <div id="status-info">
+          <p class="placeholder-text">Start a new game to begin.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

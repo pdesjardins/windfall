@@ -5,7 +5,7 @@ Windfall is a turn-based strategy game of nautical exploration and conquest. You
 
 ## The World
 
-Every game of Windfall takes place on a unique map generated when you start a new game. The world is a hex grid of ocean and land, with coastlines, forests, farmland, and rocky terrain shaped by natural processes. You begin with no knowledge of the world — it is entirely hidden until your units discover it.
+Every game of Windfall takes place on a unique map generated when you start a new game. The world is a hex grid of ocean and land, with coastlines, forests, grassland, and rocky terrain shaped by natural processes. You begin with no knowledge of the world — it is entirely hidden until your units discover it.
 
 ## How You Win
 

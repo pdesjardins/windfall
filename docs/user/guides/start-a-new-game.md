@@ -27,7 +27,7 @@ Your opponent — the AI player — starts on the far side of the map with the s
 
 ## What to Do First
 
-Your first priority is exploration. Sail along coastlines to reveal terrain. You are looking for land with a combination of useful features: stone for defense, farmland and forest for production, and a natural shape that will reduce how many wall segments you need to build.
+Your first priority is exploration. Sail along coastlines to reveal terrain. You are looking for land with a combination of useful features: stone for defense, grassland and forest for production, and a natural shape that will reduce how many wall segments you need to build.
 
 Your second priority is hiding your flag. Do not leave it aboard your ship forever — a ship is a mobile target. When you find a promising piece of land, consider landing crew and hiding the flag in a location that will be hard to find.
 

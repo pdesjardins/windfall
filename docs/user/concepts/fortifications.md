@@ -1,37 +1,53 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Fortifications
 
-A fortification is a defensive structure your crew builds on land. Unlike the units in many strategy games, a fortification in Windfall is not placed as a single object. It is constructed wall segment by wall segment, and it comes to life only when your walls enclose a region of land.
+A fortification is a defensive structure your crew builds on land. It is not placed as a single object — it grows wall segment by wall segment and comes to life the moment your walls form a closed loop.
 
 ## Building Walls
 
-Any crew member on a land hex can spend turns building a fortification wall on that hex. Building one wall segment takes 5 turns. While a crew member is building, they cannot move or take other actions.
+Any crew member can spend turns improving a land hex into a wall segment. Building one wall segment takes 5 turns. While building, the crew member cannot move or take other actions.
 
-When the wall is complete, the hex becomes a wall segment. The crew member is free to move to an adjacent hex and begin building the next segment.
+Wall segments can be built on three terrain types:
 
-## Enclosure and the Living Fort
+- **Grassland** — the most common building material; standard defensive strength
+- **Forest** — forested hexes can become walls, but then cannot become logging camps
+- **Stone** — the strongest wall material; stone wall segments grant the fortification an enhanced defensive rating
 
-A wall is just a wall until it encloses something. When your wall segments — combined with any natural barriers like mountains, map edges, and coastlines — completely surround one or more interior hexes, those hexes become a live fortification.
+One improvement per hex. A grassland hex that becomes a wall cannot also become a farm. Choose carefully.
 
-The game checks for enclosure automatically after each wall segment is completed. You do not need to declare when you are done building.
+## Mountains as Natural Walls
 
-This means the landscape itself can be part of your fortification. A line of mountains can serve as one wall. A coastline can close off an opening. A skilled player reads the terrain and builds only the walls that nature has not already provided.
+Your crew never needs to build on mountain hexes. Mountains act as natural wall segments automatically. A chain of wall segments that passes through mountain terrain is valid — mountains close the gap without any construction cost.
+
+## When a Fortification Goes Live
+
+A fortification goes live the moment your wall segments — combined with any mountain hexes — form a **closed loop connected to itself**. The hexes enclosed by that loop become the fortification interior.
+
+You do not need to declare the fortification complete. The game detects the closed loop automatically after each wall segment is built.
+
+This means you can build forts of any shape. A small tight ring is quick to build but encloses less space. A large ring takes more turns but may enclose better terrain. A ring that uses mountain faces as walls is cheaper to close. Reading the landscape and finding the natural shapes is the skill.
+
+## Coastal Fortifications
+
+A fortification that contains wall segments on land hexes adjacent to coast hexes is a **coastal fortification**. Coastal fortifications can produce ships, which appear in the water next to the fort when ready.
+
+Your own crew can board and leave ships at your coastal fortification's shore — gates and ship-handling facilities are assumed. Enemy crew cannot disembark at your shore; the fort fires on them.
 
 ## What a Live Fortification Does
 
-Once a fortification is live, it becomes your most powerful asset on land.
+Once live, a fortification becomes your most powerful asset.
 
-**Cannons:** The fortification fires automatically at enemy units within range at the end of each of your turns. You do not need to issue a fire order.
+**Cannons:** Fires automatically at enemy units within range at the end of each of your turns. No order required.
 
-**Crew production:** If an improved farmland (a farm) is within 3 hexes, the fortification can generate new crew over time.
+**Crew production:** If a farm is within 3 hexes of the fortification, it generates new crew over time.
 
-**Ship production:** If an improved forest (a logging camp) is within 3 hexes and the fortification is adjacent to a coast hex, the fortification can generate new ships.
+**Ship production:** If a logging camp is within 3 hexes and the fortification has a shore-adjacent wall hex, it generates new ships. The ship appears on an adjacent coast hex.
 
-**Flag storage:** You can hide your flag inside a fortification, where it is defended by the fortification's cannons. You can also win the game by returning the captured enemy flag to one of your live fortifications.
+**Flag operations:** You can hide your flag inside a fortification for protection. You win the game by carrying the captured enemy flag into one of your live fortifications.
 
-## Terrain and Defense
+## Defensive Strength
 
-Stone hexes near or inside your fortification improve its defensive rating, reducing the damage it takes from cannon fire. When choosing where to build, look for rocky terrain.
+Stone wall segments increase the fortification's resistance to cannon fire. When choosing a building site, look for stone terrain — a ring of stone walls is significantly harder to destroy than one built on grassland alone.
 
 ## Related Topics
 

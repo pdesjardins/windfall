@@ -39,6 +39,9 @@ src/
       input.js            ← mouse and keyboard event handling; translates to engine calls
       hud.js              ← turn counter, unit info panel, action buttons
       dialogs.js          ← new game, save, load, win/loss modals
+    locale/               ← string resources; one module per language
+      en.js               ← English strings (default; only language currently)
+    settings.js           ← key binding defaults and user configuration
 ```
 
 ---
@@ -70,21 +73,32 @@ SE           0   +1
 
 Terrain is generated procedurally at game start using multi-octave Perlin noise (or equivalent simplex noise). The output is a heightmap over all hexes.
 
-A water level threshold is applied to the heightmap. Hexes below the threshold are ocean; hexes at or above are land.
+### Elevation as a Generation-Time Tool
 
-**Terrain types:**
+Elevation is used only during terrain classification. It is discarded afterward — no hex carries an elevation value into gameplay or rendering. The heightmap's sole purpose is to determine terrain type.
+
+Three thresholds are applied in order:
+
+1. **Water threshold** — hexes below this elevation become ocean or coast.
+2. **Mountain threshold** — hexes above this elevation become mountain.
+3. **Remaining land** — hexes between the two thresholds become grassland, forest, or stone, determined by secondary rules (noise layers, adjacency).
+
+After classification, all non-ocean, non-mountain hexes are treated as flat. The renderer does not depict or acknowledge elevation differences between land hexes. Terrain *type* carries all visual and strategic meaning; terrain *height* does not.
+
+This simplification keeps the renderer flat and unambiguous — every hex is the same geometric shape, differentiated by type, not altitude. Stone hexes carry the visual language of rugged high terrain without requiring elevation data at render time.
+
+### Terrain Types
 
 | Type | Description | Gameplay Effect |
 |---|---|---|
 | `ocean` | Open water | Ships navigate; crew cannot enter |
-| `coast` | Water adjacent to land | Ships may anchor here to deploy crew |
-| `plains` | Low-elevation land | Standard movement cost |
-| `forest` | Forested land | Source of ship production when improved |
-| `farmland` | Agricultural land | Source of crew production when improved |
-| `stone` | Rocky/mountainous terrain | Defensive bonus for adjacent fortifications |
-| `mountain` | High-elevation impassable land | Blocks movement |
+| `coast` | Water hex adjacent to land | Ships navigate; crew embark/disembark across the coast-to-land boundary |
+| `grassland` | Open grassy terrain | Crew navigate; improvable into farm or wall |
+| `forest` | Forested land | Crew navigate; improvable into logging camp or wall |
+| `stone` | Rocky terrain | Crew navigate; improvable into wall; stone walls grant defensive bonus |
+| `mountain` | High-elevation impassable land | Blocks all movement; acts as natural wall segment |
 
-Terrain type is determined by elevation band and adjacency rules applied after flood-fill.
+Terrain type is determined by elevation band and secondary adjacency/noise rules applied after the initial classification pass. The heightmap is not retained after this step.
 
 ---
 
@@ -110,18 +124,24 @@ The enemy flag becomes visible when a player crew unit is directly adjacent to i
 
 ## Fortification System
 
-Fortifications are not placed as single units. They are constructed wall-by-wall by crew units and emerge when an enclosure is detected.
+Fortifications are built wall segment by wall segment and go live when the wall forms a closed loop.
 
-**Wall construction:** A crew unit spends 5 turns on a land hex to place one fortification wall segment on that hex.
+**Improvements and mutual exclusivity:** A wall is a hex improvement. Each hex holds exactly one improvement. Grassland accepts a farm or wall. Forest accepts a logging camp or wall. Stone accepts a wall only. Mountains are natural wall segments requiring no improvement.
 
-**Enclosure detection:** After each wall placement, a flood-fill from outside the map boundary determines which interior hexes are fully enclosed by wall segments (and/or map edges, mountain hexes, or coastlines). Any enclosed region becomes a live fortification interior.
+**Wall construction:** A crew unit spends 5 turns on a grassland, forest, or stone hex to convert it to a wall improvement.
+
+**Live detection:** After each wall placement, the game checks whether the new wall hex completes a closed loop — a contiguous chain of wall hexes and/or mountain hexes connected back to itself. When a closed loop is detected, the hexes enclosed by the loop become the live fortification interior.
+
+**Embarkation:** Crew may embark and disembark across the boundary between a coast hex and an adjacent friendly wall hex (gates assumed). Enemy wall hexes block disembarkation and trigger cannon fire.
 
 **Live fortification capabilities:**
 - Fires cannons at enemy units within range (automatic, end of player turn)
-- Generates crew if an improved farmland hex is within 3 hexes
-- Generates ships if an improved forest hex is within 3 hexes and the fortification is adjacent to a coast hex
+- Generates crew units if a farm is within 3 hexes
+- Generates ship units if a logging camp is within 3 hexes and the fortification contains a shore-adjacent wall hex; the ship appears on an adjacent coast hex
 - Can receive and protect the enemy flag (win condition)
 - Can store the player's own flag (hidden flag location)
+
+**Stone wall bonus:** Wall segments on stone hexes increase the fortification's defensive rating. The bonus is intrinsic to the stone material, not to proximity.
 
 ---
 
@@ -166,6 +186,54 @@ AI sophistication is intentionally limited in the initial implementation. The AI
 
 ---
 
+## Localization
+
+All user-visible strings are externalized to `src/js/locale/en.js`. No raw string literals appear in UI code. The active locale module is loaded at initialization and injected into UI modules.
+
+The project is localization-ready but ships only in English. Adding a language requires creating a new locale module and a language-selection mechanism — neither is implemented currently.
+
+**RTL layout:** All CSS uses logical properties (`margin-inline-start`, `padding-inline-end`, etc.) rather than physical directional properties. The `dir` attribute on `<html>` controls layout direction. Canvas-rendered text is not covered by this mechanism and must be handled separately if RTL canvas text is required.
+
+**Number formatting:** `Intl.NumberFormat` is not currently used. All numbers in the game are small integers (turn counter, unit counts, production countdowns) passed through locale module functions. If locale-appropriate number formatting is needed in future, it can be added in one place within the locale module without changes elsewhere in the codebase.
+
+---
+
+## Key Binding System
+
+The hex map is keyboard-navigable. The canvas element is focusable (`tabindex="0"`) and receives keyboard events when focused.
+
+### Hex Cursor Navigation
+
+For a flat-top hex grid, the six directions map to the QWEASDZXC key block:
+
+```
+Q(NW)  W( — )  E(NE)
+A( W)  S(wait)  D( E)
+Z(SW)  X( — )  C(SE)
+```
+
+`W` and `X` are unassigned (no corresponding flat-top hex direction). `S` is "wait" — pass the selected unit's turn without moving.
+
+### Key Binding Configuration
+
+Default bindings are defined in `src/js/settings.js` as a plain object:
+
+```javascript
+export const DEFAULT_KEYBINDINGS = {
+  hexNW: 'q', hexNE: 'e',
+  hexW:  'a', hexE:  'd',
+  hexSW: 'z', hexSE: 'c',
+  wait:  's',
+  confirm: 'Enter',
+  cancel:  'Escape',
+  endTurn: 'Return', // keyboard equivalent of End Turn button
+};
+```
+
+User customizations are stored in `localStorage` and merged over defaults at startup. The full reference is in `docs/user/reference/keybindings.md`.
+
+---
+
 ## Save File Format
 
 Game state serializes to a single JSON object downloaded as `windfall-save.json`.
@@ -179,7 +247,7 @@ Game state serializes to a single JSON object downloaded as `windfall-save.json`
     "width": 120,
     "height": 80,
     "hexes": [
-      { "q": 0, "r": 0, "terrain": "ocean", "elevation": 0.12 }
+      { "q": 0, "r": 0, "terrain": "ocean" }
     ]
   },
   "players": {
@@ -205,3 +273,9 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-18 | No frameworks | Portfolio requires pure HTML/JS; simpler for agent reasoning |
 | 2026-04-18 | Engine/UI separation | Enables Node.js unit testing of all game logic |
 | 2026-04-18 | JSON save to file download | No backend required; works with static hosting |
+| 2026-04-18 | Wall is a hex improvement (one per hex) | Consistent with farm/logging camp model; stone walls grant defensive bonus from material |
+| 2026-04-18 | Elevation discarded after terrain classification | 2D hex grid cannot depict inter-hex elevation differences meaningfully; terrain type carries all visual and strategic meaning; heightmap is a generation tool only — not stored in save files |
+| 2026-04-18 | Localization via externalized string modules | No raw strings in UI code; RTL support via CSS logical properties; English only currently but architecture is translation-ready |
+| 2026-04-18 | QWEASDZXC default hex navigation keys | 3×3 key block mirrors hex geometry; 6 direction keys + wait; W and X unassigned; bindings are user-customizable via localStorage |
+| 2026-04-18 | Closed-loop detection replaces flood-fill enclosure | Simpler and more accurate to design intent; mountains participate as natural segments |
+| 2026-04-18 | Coast is a water hex; embarkation crosses land/coast boundary | Corrects prior misuse of "coastal" as a land type |
