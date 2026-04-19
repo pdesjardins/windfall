@@ -33,17 +33,21 @@ A fortification that contains wall segments on land hexes adjacent to coast hexe
 
 Your own crew can board and leave ships at your coastal fortification's shore — gates and ship-handling facilities are assumed. Enemy crew cannot disembark at your shore; the fort fires on them.
 
-## What a Live Fortification Does
+## What a Wall Does Immediately
 
-Once live, a fortification becomes your most powerful asset.
+You do not need to complete an enclosure to get value from a wall. **Any wall segment fires cannons automatically** at adjacent enemies at the end of your turn — including a single isolated wall hex. A lone stone wall on a clifftop fires the moment it is built.
 
-**Cannons:** Fires automatically at enemy units within range at the end of each of your turns. No order required.
+This means you can establish a defensive position piece by piece, gaining tactical value with every wall segment you complete.
 
-**Crew production:** If a farm is within 3 hexes of the fortification, it generates new crew over time.
+## What an Enclosed Fortification Adds
 
-**Ship production:** If a logging camp is within 3 hexes and the fortification has a shore-adjacent wall hex, it generates new ships. The ship appears on an adjacent coast hex.
+Enclosure unlocks the full capability set:
 
-**Flag operations:** You can hide your flag inside a fortification for protection. You win the game by carrying the captured enemy flag into one of your live fortifications.
+**Crew production:** If a farm is within 3 hexes, the fortification generates new crew over time.
+
+**Ship production:** If a logging camp is within 3 hexes and the fortification has a wall hex adjacent to a coast hex, it generates new ships. Ships appear on an adjacent coast hex.
+
+**Flag operations:** You can carry the captured enemy flag into an enclosed fortification to win the game. You can also hide your own flag inside one for protection.
 
 ## Defensive Strength
 

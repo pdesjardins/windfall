@@ -31,7 +31,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 ### Map
 
-- Hex grid using axial coordinates, approximately 120×80 hexes (~9,600 total).
+- Hex grid using axial coordinates, approximately 200×150 hexes (~30,000 total). The large map supports long exploration arcs and keeps starting positions far apart.
 - Procedurally generated using multi-octave noise. Each game produces a unique map.
 - A heightmap is generated and used to classify terrain types, then discarded. Elevation is a generation-time tool only — it has no role in gameplay or rendering after classification.
 - Two elevation thresholds are applied: a water threshold (below → ocean/coast) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone.
@@ -48,6 +48,23 @@ The game is free to play. It is distributed as a static website. No account, ser
 | Forest | Crew | Can be improved into a logging camp or wall |
 | Stone | Crew | Can be improved into a wall; stone walls provide a defensive bonus |
 | Mountain | Neither | Impassable; acts as a natural wall segment |
+
+### Wind
+
+Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts gradually over the course of the game, rotating one step per N turns (N is a tunable constant).
+
+Wind affects ship movement through **points of sail** — the angle between a ship's heading and the wind direction:
+
+| Point of Sail | Directions | Ship AP |
+|---|---|---|
+| Running (downwind) | 1 direction (with wind) | 3 |
+| Beam reach | 2 directions (60° off wind) | 2 |
+| Close reach | 2 directions (120° off wind) | 1 |
+| In irons (into wind) | 1 direction (against wind) | 1 — attack only, no movement into wind |
+
+A ship in irons receives 1 AP but may only spend it on a cannon attack, not on moving further into the wind. This allows return fire without allowing upwind movement.
+
+Wind direction is displayed as a compass rose in the UI.
 
 ### Fog of War
 
@@ -73,16 +90,22 @@ The enemy flag becomes visible only when a player unit is directly adjacent to i
 
 Crew are the player's land-based units. All crew are identical in capability.
 
+**Action points:** 2 per turn. Unaffected by wind.
+
+**Hit points:** 1. Any hit destroys a crew unit. A stack of crew on one hex absorbs hits one unit at a time — each hit kills one crew member, leaving survivors intact.
+
 **Capabilities:**
-- Navigate land hexes (costs 1 turn per hex, standard terrain)
+- Navigate land hexes (1 AP per hex)
 - Sail a ship (requires at least 1 crew aboard)
 - Improve a land hex into a wall segment (5 turns; valid on grassland, forest, stone)
-- Improve grassland into farm (cost TBD by testing; mutually exclusive with wall)
-- Improve forest into logging camp (cost TBD by testing; mutually exclusive with wall)
-- Fight enemy crew (combat resolution TBD)
+- Improve grassland into farm (cost TBD; mutually exclusive with wall)
+- Improve forest into logging camp (cost TBD; mutually exclusive with wall)
+- Attack enemy units by moving onto their hex (1 AP; see Combat)
 - Pick up, carry, and hide the player's flag
 - Capture the enemy's flag by moving onto its hex
 - Return captured enemy flag to a friendly fortification (win condition)
+
+**Stacking:** Any number of friendly crew may occupy the same hex. Enemy units may never share a hex.
 
 **Constraints:**
 - A ship requires at least 1 crew aboard to move. A ship with 0 crew is inert.
@@ -93,18 +116,24 @@ Crew are the player's land-based units. All crew are identical in capability.
 
 ### Ship
 
-All ships are identical. A ship retains full capability until destroyed.
+All ships are identical. A ship retains full capability until destroyed — there is no degraded state.
+
+**Action points:** Determined by wind and point of sail each turn (1–3 AP). See Wind section.
+
+**Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
 **Capabilities:**
-- Navigate ocean and coast hexes
+- Navigate ocean and coast hexes (1 AP per hex)
 - Transport crew (capacity TBD; initial value: 6 crew)
-- Fire cannons at enemy ships and fortifications within range (range TBD; initial value: 2 hexes)
-- Deploy crew to an adjacent land hex that borders a coast hex
-- Embark crew from an adjacent shore-adjacent land hex
+- Fire cannons at adjacent enemy units (1 AP; range 1 hex; see Combat)
+- Deploy crew to an adjacent shore-adjacent land hex (1 AP)
+- Embark crew from an adjacent shore-adjacent land hex (1 AP)
 
-**Production:** Ships are produced by a live fortification that contains a shore-adjacent wall hex and is within 3 hexes of a logging camp. The produced ship appears on an adjacent coast hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
+**Stacking:** Multiple friendly ships may occupy the same hex.
 
-**Destruction:** A ship destroyed in combat is removed from the game permanently. Crew aboard a destroyed ship are also lost.
+**Production:** A fortification that contains a shore-adjacent wall hex and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent coast hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
+
+**Destruction:** A destroyed ship is removed permanently. Crew aboard are lost.
 
 ---
 
@@ -139,21 +168,39 @@ Mountain hexes participate as natural wall segments without requiring any improv
 - **Friendly fortification:** crew may embark and disembark freely across shore-adjacent wall hexes (gates are assumed).
 - **Enemy fortification:** crew may not disembark onto a shore-adjacent enemy wall hex; the fort fires on approaching units.
 
-### Live Fortification Capabilities
+### Two-Tier Fortification Model
+
+Fortifications provide value in two distinct tiers:
+
+**Tier 1 — Any wall segment**
+A single wall hex, or any chain of wall hexes not yet forming a closed loop, fires cannons automatically at adjacent enemy units at the end of the player's turn. No enclosure required. A lone wall segment on a stone outcrop is immediately tactically useful.
+
+**Tier 2 — Enclosed fortification**
+When wall hexes form a closed loop, the enclosed interior becomes a live fortification, unlocking the full capability set:
 
 | Capability | Condition |
 |---|---|
-| Fire cannons | Automatically fires at enemy units within 2 hexes at end of player turn |
+| Fire cannons (auto) | End of player turn; all wall segments fire at adjacent enemies |
 | Generate crew | Farm within 3 hexes |
-| Generate ships | Logging camp within 3 hexes AND fortification contains a shore-adjacent wall hex |
-| Accept captured flag | Any live fortification belonging to the flag carrier's player |
-| Store hidden flag | Any live fortification belonging to the owning player |
+| Generate ships | Logging camp within 3 hexes AND a shore-adjacent wall hex exists |
+| Accept captured flag (win) | Carrier enters any friendly enclosed fortification |
+| Store hidden flag | Owner places flag in any friendly wall hex or interior |
 
-When a ship is generated, it appears as a unit on an adjacent coast hex.
+When a ship is generated, it appears on an adjacent coast hex.
+
+### Wall Segment Hit Points
+
+Wall segments are destructible. Ships and crew may attack wall segments (1 AP; range 1 hex). Stone wall segments have more HP than grassland or forest wall segments. When a wall segment's HP reaches 0 it is destroyed, opening a gap in the wall. If the gap breaks the closed loop, the fortification loses its Tier 2 status until the gap is repaired.
+
+| Wall type | Relative durability |
+|---|---|
+| Stone wall | High (TBD) |
+| Grassland wall | Medium (TBD) |
+| Forest wall | Medium (TBD) |
 
 ### Stone Wall Bonus
 
-Wall segments built on stone hexes increase the fortification's defensive rating (damage reduction TBD). Stone provides the bonus because of the material, not merely its location — only stone wall hexes confer this benefit.
+Stone wall segments have higher HP than other wall types and increase the fortification's resistance to cannon damage. The bonus comes from the material — only stone wall hexes confer it.
 
 ---
 
@@ -173,7 +220,7 @@ Each player has one flag. Flags are the central objective of the game.
 
 **At game start:** Both flags begin in the `carried` state, held by a designated crew unit aboard each player's starting ship.
 
-**Hiding a flag:** The carrying crew unit must be on a land hex. Hiding costs 1 turn. The flag transitions to `hidden` on that hex. Valid hide locations include any explored land hex, including inside a live fortification.
+**Hiding a flag:** The carrying crew unit must be on a land hex. Hiding costs 1 AP. The flag transitions to `hidden` on that hex. Valid hide locations: any land hex the player can place a unit on — including friendly wall segments and fortification interiors. Excludes enemy-controlled hexes (enemy wall segments and their interiors).
 
 **Re-hiding a flag:** The owning player may pick up their hidden flag (1 turn action, unit must be adjacent) and hide it elsewhere.
 
@@ -215,6 +262,42 @@ The initial AI is intentionally simple. Sophistication will increase in later it
 
 ---
 
+## Combat
+
+Combat has no separate command. All attacks are expressed as movement.
+
+### Cannon Attack (Ships and Wall Segments)
+
+- **Range:** 1 hex (adjacent only). Constant for all cannon sources.
+- **Cost:** 1 AP for ships. Wall segments fire automatically at end of player turn at no AP cost.
+- **Attacker stays on its hex.** Ships may fire across the land/sea boundary (e.g., at crew or walls on an adjacent land hex). The ship never moves onto a land hex.
+- **Target takes damage.** Ships lose HP; crew are destroyed; wall segments lose HP.
+
+### Melee Attack (Crew)
+
+- **Range:** 1 hex (adjacent only).
+- **Cost:** 1 AP. The crew unit attempts to move onto the enemy hex.
+- **If attacker wins:** Attacker occupies the contested hex. Enemy unit is destroyed.
+- **If attacker is repulsed:** Both sides take damage (attacker loses 1 HP = destroyed; defender loses 1 HP = destroyed). Both units remain on their original hexes.
+- Crew may attack enemy crew, enemy wall segments, and enemy ships adjacent to their land hex.
+
+### Hit Points Summary
+
+| Unit / Structure | HP Model | Notes |
+|---|---|---|
+| Crew | 1 HP | Any hit is lethal; stacks absorb hits one unit at a time |
+| Ship | Multi-hit (TBD) | Full capability until destroyed; no degraded state |
+| Wall segment (stone) | Multi-hit, high (TBD) | Most durable wall type |
+| Wall segment (grassland/forest) | Multi-hit, medium (TBD) | Standard durability |
+
+### Destruction Consequences
+
+- **Crew destroyed:** Removed from map.
+- **Ship destroyed:** Removed from map; crew aboard are lost.
+- **Wall segment destroyed:** Gap opens in wall. If gap breaks a closed loop, the enclosure loses Tier 2 status until repaired.
+
+---
+
 ## Turn Structure
 
 Windfall uses a sequential turn structure modeled on early Civilization.
@@ -222,7 +305,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 1. **Human turn:** The player takes all actions for their units. When satisfied, the player ends their turn.
 2. **AI turn:** The AI takes all actions for its units. When complete, the next human turn begins.
 
-**Action points:** Each unit has a fixed number of action points per turn (TBD; initial value: 3 for crew, 4 for ships). Movement and actions cost action points.
+**Action points:** Crew receive 2 AP per turn. Ships receive 1–3 AP per turn based on wind and point of sail (see Wind section).
 
 ---
 
@@ -264,3 +347,13 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-18 | Fortification goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
 | 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary |
 | 2026-04-18 | Friendly forts allow embarkation at shore-adjacent wall hexes | Gates are assumed; enemy forts fire on approaching units and block disembarkation |
+| 2026-04-19 | Map size 200×150 (~30,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
+| 2026-04-19 | Wind system with points of sail (1–3 AP) | Authentic nautical mechanic; creates meaningful directional decisions without simulation complexity |
+| 2026-04-19 | In irons: 1 AP attack-only, no upwind movement | Ships can always return fire; cannot exploit wind to move upwind |
+| 2026-04-19 | Two-tier fortification: wall fires immediately, enclosure unlocks production | Any wall hex is tactically useful; enclosure rewards sustained building effort |
+| 2026-04-19 | Attack is implicit movement, no explicit attack command | Simplifies controls; moving onto enemy hex = attack; unified model for all unit types |
+| 2026-04-19 | Cannon range = 1 hex, constant | Simple and consistent; no range tracking required |
+| 2026-04-19 | Crew are 1 HP units; ships and walls are multi-hit | Crew losses feel significant; ships and forts require sustained effort to destroy |
+| 2026-04-19 | Ships retain full capability until destroyed (binary) | No degraded state tracking; consistent with "all ships identical" principle |
+| 2026-04-19 | Friendly crew stack freely; ships stack freely; enemies never share a hex | Stacks absorb hits naturally; contact with enemy always triggers combat |
+| 2026-04-19 | Flag hiding: any land hex the player can place a unit on | Excludes enemy-controlled hexes; includes friendly wall segments and interiors |

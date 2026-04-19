@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-const { defineConfig } = require('@playwright/test');
+import { defineConfig } from '@playwright/test';
 
-module.exports = defineConfig({
+export default defineConfig({
   testDir: './tests/e2e',
   use: {
     baseURL: 'http://localhost:3000',

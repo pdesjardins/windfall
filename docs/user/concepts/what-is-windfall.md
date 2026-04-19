@@ -19,8 +19,9 @@ A full game of Windfall unfolds over many turns and may span multiple sessions. 
 
 ## Related Topics
 
-- [The Hex Grid](hex-grid.md)
 - [Fog of War](fog-of-war.md)
+- [Wind](wind.md)
 - [Crew and Ships](units.md)
 - [Fortifications](fortifications.md)
+- [Combat](combat.md)
 - [The Flag](flag.md)

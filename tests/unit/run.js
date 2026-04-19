@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-// Unit test runner. Engine modules will be tested here as they are implemented.
-// Sprint 0 has no engine modules; this runner confirms the test infrastructure works.
+import { runTests as hexTests } from './engine/hex.test.js';
+import { runTests as terrainTests } from './engine/terrain.test.js';
 
 let passed = 0;
 let failed = 0;
@@ -22,6 +22,14 @@ console.log('Running unit tests...\n');
 console.log('Infrastructure');
 assert('test runner executes', true);
 assert('Node.js version is sufficient', parseInt(process.versions.node) >= 18);
+
+// Sprint 1A: hex math
+console.log('\nHex Math (hex.js)');
+hexTests(assert);
+
+// Sprint 1A: terrain generation
+console.log('\nTerrain Generation (terrain.js)');
+terrainTests(assert);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 

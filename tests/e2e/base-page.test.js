@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-const { test, expect } = require('@playwright/test');
+import { test, expect } from '@playwright/test';
 
 test('page title contains Windfall', async ({ page }) => {
   await page.goto('/');
