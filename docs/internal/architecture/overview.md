@@ -74,21 +74,23 @@ SE           0   +1
 
 ## Terrain System
 
-Terrain is generated procedurally at game start using multi-octave Perlin noise (or equivalent simplex noise). The output is a heightmap over all hexes.
+Terrain is generated procedurally at game start from two independent seeded noise maps. The heightmap is used only for classification and discarded afterward.
 
 ### Elevation as a Generation-Time Tool
 
-Elevation is used only during terrain classification. It is discarded afterward — no hex carries an elevation value into gameplay or rendering. The heightmap's sole purpose is to determine terrain type.
+Elevation is used only during terrain classification. It is discarded afterward — no hex carries an elevation value into gameplay or rendering.
 
-Three thresholds are applied in order:
+Generation uses **ridged multifractal noise** (value noise with a ridge transform applied per octave). This produces sharp mountain ridges, island silhouettes, and inland lake basins rather than the rolling hills of standard fractal noise.
 
-1. **Water threshold** — hexes below this elevation become ocean or coast.
+Classification applies two thresholds in order:
+
+1. **Water threshold** — hexes below this elevation become ocean.
 2. **Mountain threshold** — hexes above this elevation become mountain.
-3. **Remaining land** — hexes between the two thresholds become grassland, forest, or stone, determined by secondary rules (noise layers, adjacency).
+3. **Remaining land** — classified into grassland, forest, or stone by a separate biome noise map. Stone is biome-determined, not elevation-determined, so it scatters freely across all land.
 
-After classification, all non-ocean, non-mountain hexes are treated as flat. The renderer does not depict or acknowledge elevation differences between land hexes. Terrain *type* carries all visual and strategic meaning; terrain *height* does not.
+A secondary **volcanic scatter pass** runs after primary classification. A fixed number of random seed points are placed on land hexes; each seed and a random subset of its neighbors become mountain. This produces isolated peaks and small ridges anywhere on the map, including near coastlines, independent of the elevation-based mountain band.
 
-This simplification keeps the renderer flat and unambiguous — every hex is the same geometric shape, differentiated by type, not altitude. Stone hexes carry the visual language of rugged high terrain without requiring elevation data at render time.
+After classification, all non-ocean, non-mountain hexes are treated as flat. Stone hexes carry the visual language of rugged terrain without requiring elevation data at render time.
 
 ### Terrain Types
 
@@ -98,9 +100,7 @@ This simplification keeps the renderer flat and unambiguous — every hex is the
 | `grassland` | Open grassy terrain | Crew navigate; improvable into farm or wall |
 | `forest` | Forested land | Crew navigate; improvable into logging camp or wall |
 | `stone` | Rocky terrain | Crew navigate; improvable into wall; stone walls grant defensive bonus |
-| `mountain` | High-elevation impassable land | Blocks all movement; acts as natural wall segment |
-
-Terrain type is determined by elevation band and secondary adjacency/noise rules applied after the initial classification pass. The heightmap is not retained after this step.
+| `mountain` | Impassable high terrain | Blocks all movement; acts as natural wall segment |
 
 ---
 
@@ -321,3 +321,6 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-18 | QWEASDZXC default hex navigation keys | 3×3 key block mirrors hex geometry; 6 direction keys + wait; W and X unassigned; bindings are user-customizable via localStorage |
 | 2026-04-18 | Closed-loop detection replaces flood-fill enclosure | Simpler and more accurate to design intent; mountains participate as natural segments |
 | 2026-04-19 | Coast terrain type removed entirely | Embarkation is adjacency-based (any ocean hex next to land); separate coast type added complexity with no gameplay benefit; removed during Sprint 1B |
+| 2026-04-19 | Ridged multifractal noise for elevation | Produces sharp mountain ridges, island silhouettes, and inland lake basins; standard fractal noise produced only rolling hills |
+| 2026-04-19 | Stone classified by biome noise, not elevation | Prevents stone from forming a ring around mountains; scatters it freely across all land as patches |
+| 2026-04-19 | Volcanic scatter pass for isolated mountains | Adds tactically interesting mountain formations near coastlines independent of elevation; creates natural fortification opportunities |

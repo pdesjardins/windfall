@@ -142,8 +142,14 @@ export function render() {
 }
 
 export function pan(dx, dy) {
-  _camera.x += dx;
-  _camera.y += dy;
+  const margin = 120; // px of map that must remain on screen
+  const mapPixelW = HEX_SIZE * 1.5 * (_mapWidth - 1) + HEX_SIZE * 2;
+  const mapPixelH = HEX_SIZE * SQRT3 * _mapHeight;
+
+  _camera.x = Math.max(margin - mapPixelW,
+               Math.min(_canvas.width  - margin, _camera.x + dx));
+  _camera.y = Math.max(margin - mapPixelH,
+               Math.min(_canvas.height - margin, _camera.y + dy));
 }
 
 function fitCanvas() {

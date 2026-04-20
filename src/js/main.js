@@ -36,6 +36,10 @@ window.addEventListener('resize', () => {
   renderer.render();
 });
 
+function onBeforeUnload(e) {
+  e.preventDefault();
+}
+
 btnNewGame.addEventListener('click', () => {
   const seed = Math.floor(Math.random() * 0xffffffff);
   const terrain = generateTerrain(seed, MAP_WIDTH, MAP_HEIGHT);
@@ -45,4 +49,6 @@ btnNewGame.addEventListener('click', () => {
   btnSave.disabled = false;
   btnEndTurn.disabled = false;
   canvas.style.cursor = 'grab';
+
+  window.addEventListener('beforeunload', onBeforeUnload);
 });

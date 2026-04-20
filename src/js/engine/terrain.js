@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 
-import { MAP_WIDTH, MAP_HEIGHT, hexToIndex } from './hex.js';
+import { MAP_WIDTH, MAP_HEIGHT, hexToIndex, neighbors, inBounds } from './hex.js';
 
 export const TERRAIN_TYPES = ['ocean', 'grassland', 'forest', 'stone', 'mountain'];
 
 // Classification thresholds (0–1 range)
-const WATER_THRESHOLD       = 0.54;  // more ocean coverage
+const WATER_THRESHOLD       = 0.63;  // more ocean coverage
 const MOUNTAIN_THRESHOLD    = 0.77;  // more mountains
 const STONE_BIOME_MAX       = 0.40;  // bottom 40% of biome noise → stone patches
 const FOREST_THRESHOLD      = 0.55;  // top ~45% of biome → forest; middle → grassland
@@ -90,9 +90,13 @@ function fractalNoise(rand, octaves, mapW, mapH, startGrid, persistence, ridge =
   return out;
 }
 
+const VOLCANIC_SEEDS    = 160; // number of isolated mountain seed points
+const NEIGHBOR_CHANCE   = 0.4; // probability each neighbor of a seed also becomes mountain
+
 export function generateTerrain(seed, width = MAP_WIDTH, height = MAP_HEIGHT) {
   const rand1 = mulberry32(seed);
   const rand2 = mulberry32(seed ^ 0xdeadbeef);
+  const rand3 = mulberry32(seed ^ 0xc0ffee);
 
   const elevation = fractalNoise(rand1, ELEVATION_OCTAVES, width, height, ELEVATION_START, ELEVATION_PERSISTENCE, true);
   const biome     = fractalNoise(rand2, BIOME_OCTAVES,     width, height, BIOME_START,     BIOME_PERSISTENCE,     false);
@@ -112,6 +116,23 @@ export function generateTerrain(seed, width = MAP_WIDTH, height = MAP_HEIGHT) {
       terrain[i] = 'forest';
     } else {
       terrain[i] = 'grassland';
+    }
+  }
+
+  // Scatter isolated volcanic mountains across land, including near coastlines.
+  // Each seed picks a random land hex; neighbors have a chance to also become mountain.
+  for (let s = 0; s < VOLCANIC_SEEDS; s++) {
+    const q = Math.floor(rand3() * width);
+    const r = Math.floor(rand3() * height);
+    const i = hexToIndex(q, r, width);
+    if (terrain[i] === 'ocean') continue;
+    terrain[i] = 'mountain';
+    for (const [nq, nr] of neighbors(q, r)) {
+      if (!inBounds(nq, nr, width, height)) continue;
+      const ni = hexToIndex(nq, nr, width);
+      if (terrain[ni] !== 'ocean' && rand3() < NEIGHBOR_CHANCE) {
+        terrain[ni] = 'mountain';
+      }
     }
   }
 

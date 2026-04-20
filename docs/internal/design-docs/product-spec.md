@@ -34,7 +34,8 @@ The game is free to play. It is distributed as a static website. No account, ser
 - Hex grid using axial coordinates, approximately 200×150 hexes (~30,000 total). The large map supports long exploration arcs and keeps starting positions far apart.
 - Procedurally generated using multi-octave noise. Each game produces a unique map.
 - A heightmap is generated and used to classify terrain types, then discarded. Elevation is a generation-time tool only — it has no role in gameplay or rendering after classification.
-- Two elevation thresholds are applied: a water threshold (below → ocean) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone by a separate biome noise map.
+- Two elevation thresholds are applied using ridged multifractal noise: a water threshold (below → ocean) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone by a separate biome noise map. Stone is biome-determined so it scatters freely rather than forming elevation bands.
+- A secondary volcanic scatter pass places isolated mountain peaks and small clusters randomly across land, including near coastlines, to create tactically interesting formations independent of the primary elevation map.
 - All non-ocean, non-mountain hexes are rendered as flat. No elevation differences between land hexes are depicted or acknowledged.
 - The human player and AI player start on opposite sides of the map, far enough apart that early contact requires deliberate exploration.
 
