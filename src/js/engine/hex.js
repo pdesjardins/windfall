@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
-export const MAP_WIDTH = 200;
-export const MAP_HEIGHT = 150;
+export const MAP_WIDTH = 300;
+export const MAP_HEIGHT = 200;
 
 // Flat-top axial hex directions in clockwise order starting from upper-right.
 // Each entry is [dq, dr] for the six neighbors.

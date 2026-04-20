@@ -34,7 +34,8 @@ The game is free to play. It is distributed as a static website. No account, ser
 - Hex grid using axial coordinates, approximately 200×150 hexes (~30,000 total). The large map supports long exploration arcs and keeps starting positions far apart.
 - Procedurally generated using multi-octave noise. Each game produces a unique map.
 - A heightmap is generated and used to classify terrain types, then discarded. Elevation is a generation-time tool only — it has no role in gameplay or rendering after classification.
-- Two elevation thresholds are applied: a water threshold (below → ocean/coast) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone.
+- Two elevation thresholds are applied using ridged multifractal noise: a water threshold (below → ocean) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone by a separate biome noise map. Stone is biome-determined so it scatters freely rather than forming elevation bands.
+- A secondary volcanic scatter pass places isolated mountain peaks and small clusters randomly across land, including near coastlines, to create tactically interesting formations independent of the primary elevation map.
 - All non-ocean, non-mountain hexes are rendered as flat. No elevation differences between land hexes are depicted or acknowledged.
 - The human player and AI player start on opposite sides of the map, far enough apart that early contact requires deliberate exploration.
 
@@ -42,8 +43,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 | Terrain | Navigable By | Notes |
 |---|---|---|
-| Ocean | Ships | Open water; standard naval movement |
-| Coast | Ships | Water hex adjacent to land; crew embark/disembark across coast-to-land boundary |
+| Ocean | Ships | Open water; crew embark/disembark at any ocean hex adjacent to land |
 | Grassland | Crew | Standard land movement; can be improved into a farm or wall |
 | Forest | Crew | Can be improved into a logging camp or wall |
 | Stone | Crew | Can be improved into a wall; stone walls provide a defensive bonus |
@@ -123,7 +123,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 **Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
 **Capabilities:**
-- Navigate ocean and coast hexes (1 AP per hex)
+- Navigate ocean hexes (1 AP per hex)
 - Transport crew (capacity TBD; initial value: 6 crew)
 - Fire cannons at adjacent enemy units (1 AP; range 1 hex; see Combat)
 - Deploy crew to an adjacent shore-adjacent land hex (1 AP)
@@ -131,7 +131,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 **Stacking:** Multiple friendly ships may occupy the same hex.
 
-**Production:** A fortification that contains a shore-adjacent wall hex and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent coast hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
+**Production:** A fortification that contains a wall hex adjacent to ocean and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent ocean hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
 
 **Destruction:** A destroyed ship is removed permanently. Crew aboard are lost.
 
