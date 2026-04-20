@@ -122,6 +122,10 @@ Visibility is recalculated each turn after all unit moves.
 
 The enemy flag becomes visible when a player crew unit is directly adjacent to it (1 hex).
 
+**Rendering:** The starfield background is clipped to explored and visible hexes only. Undiscovered hexes and the area outside the map boundary render as solid black. Players discover the space scene by exploring to the map edge.
+
+**Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears on the canvas when active. This toggle is available at all times for design and testing work.
+
 ---
 
 ## Fortification System

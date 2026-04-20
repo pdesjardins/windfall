@@ -2,6 +2,8 @@
 
 import { runTests as hexTests } from './engine/hex.test.js';
 import { runTests as terrainTests } from './engine/terrain.test.js';
+import { runTests as fogTests } from './engine/fog.test.js';
+import { runTests as gameTests } from './engine/game.test.js';
 
 let passed = 0;
 let failed = 0;
@@ -30,6 +32,14 @@ hexTests(assert);
 // Sprint 1A: terrain generation
 console.log('\nTerrain Generation (terrain.js)');
 terrainTests(assert);
+
+// Sprint 2A: fog of war
+console.log('\nFog of War (fog.js)');
+fogTests(assert);
+
+// Sprint 2A: game state
+console.log('\nGame State (game.js)');
+gameTests(assert);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 
