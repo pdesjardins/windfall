@@ -11,10 +11,10 @@ export function initFog(width, height) {
 }
 
 export function setVisible(fog, q, r, sightRange, width, height) {
-  for (let dr = -sightRange; dr <= sightRange; dr++) {
-    for (let dq = -sightRange; dq <= sightRange; dq++) {
-      const nq = q + dq;
-      const nr = r + dr;
+  // r bounding box needs extra padding for the even-q offset stagger
+  const rPad = Math.floor(sightRange / 2) + 1;
+  for (let nq = q - sightRange; nq <= q + sightRange; nq++) {
+    for (let nr = r - sightRange - rPad; nr <= r + sightRange + rPad; nr++) {
       if (!inBounds(nq, nr, width, height)) continue;
       if (distance(q, r, nq, nr) > sightRange) continue;
       const i = hexToIndex(nq, nr, width);

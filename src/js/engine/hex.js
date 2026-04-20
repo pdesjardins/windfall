@@ -3,24 +3,37 @@
 export const MAP_WIDTH = 300;
 export const MAP_HEIGHT = 200;
 
-// Flat-top axial hex directions in clockwise order starting from upper-right.
-// Each entry is [dq, dr] for the six neighbors.
+// The map uses even-q offset coordinates (column, row). DIRECTIONS are axial
+// deltas; they must be applied via neighbor()/neighbors() which convert through
+// axial so the correct offset neighbor is returned regardless of column parity.
 export const DIRECTIONS = [
   [1, -1], [1, 0], [0, 1], [-1, 1], [-1, 0], [0, -1],
 ];
 
+// even-q offset ↔ axial conversion (flat-top grid)
+function toAxial(q, r)      { return { q, r: r - (q - (q & 1)) / 2 }; }
+function fromAxial(aq, ar)  { return { q: aq, r: ar + (aq - (aq & 1)) / 2 }; }
+
 export function neighbor(q, r, directionIndex) {
   const [dq, dr] = DIRECTIONS[directionIndex];
-  return [q + dq, r + dr];
+  const a = toAxial(q, r);
+  const n = fromAxial(a.q + dq, a.r + dr);
+  return [n.q, n.r];
 }
 
 export function neighbors(q, r) {
-  return DIRECTIONS.map(([dq, dr]) => [q + dq, r + dr]);
+  const a = toAxial(q, r);
+  return DIRECTIONS.map(([dq, dr]) => {
+    const n = fromAxial(a.q + dq, a.r + dr);
+    return [n.q, n.r];
+  });
 }
 
 export function distance(q1, r1, q2, r2) {
-  // Axial to cube: s = -q - r
-  return (Math.abs(q1 - q2) + Math.abs(q1 + r1 - q2 - r2) + Math.abs(r1 - r2)) / 2;
+  const a1 = toAxial(q1, r1);
+  const a2 = toAxial(q2, r2);
+  const dq = a1.q - a2.q, dr = a1.r - a2.r;
+  return (Math.abs(dq) + Math.abs(dq + dr) + Math.abs(dr)) / 2;
 }
 
 export function inBounds(q, r, width = MAP_WIDTH, height = MAP_HEIGHT) {

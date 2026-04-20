@@ -51,6 +51,7 @@ tests/                           ← all test suites
 - **Every PR must include documentation updates** for any changed or added behavior.
 - **Linters and CI are authoritative.** If a lint check fails, fix the code — do not modify the lint rule without human approval.
 - **Plans are artifacts.** Create or update an execution plan in `docs/internal/exec-plans/active/` for any non-trivial task. Move completed plans to `completed/`.
+- **Authentic nautical character.** Use correct sailing terminology wherever it applies — points of sail, in irons, windward and leeward, running before the wind. When a design or naming decision can go either way, prefer the choice a sailor would recognize. See the Design Goals section of the product spec.
 
 ---
 

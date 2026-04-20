@@ -16,6 +16,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 - **Abstracted, not realistic.** Production of crew and ships happens near grassland and forests without explicit resource counting. Being near the right terrain is sufficient. Exact quantities are tunable constants, not emergent from supply chains.
 - **Long sessions with save/resume.** A full game may span multiple real-world sessions. Players should be able to stop, think about their situation, and return.
 - **Tribute to early Civilization.** Fog of war, turn-based movement, fortification building, and terrain-based strategy are deliberate homages to that design tradition.
+- **Authentic nautical character.** Use sailing terminology wherever it applies — points of sail, in irons, windward and leeward, running before the wind. Nautical trivia and accurate sailing mechanics are part of the fun. When a design decision can go either way, prefer the choice that a sailor would recognize.
 
 ---
 
@@ -53,18 +54,18 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts gradually over the course of the game, rotating one step per N turns (N is a tunable constant).
 
-Wind affects ship movement through **points of sail** — the angle between a ship's heading and the wind direction:
+Both wind and ship heading use the six hex directions, giving exactly four possible relationships — four points of sail. Wind is named by where it comes **from** (windward convention).
 
-| Point of Sail | Directions | Ship AP |
+| Point of Sail | Steps from windward | Ship AP |
 |---|---|---|
-| Running (downwind) | 1 direction (with wind) | 3 |
-| Beam reach | 2 directions (60° off wind) | 2 |
-| Close reach | 2 directions (120° off wind) | 1 |
-| In irons (into wind) | 1 direction (against wind) | 1 — attack only, no movement into wind |
+| In irons | 0 — heading directly into wind | 1 (attack only) |
+| Close reach | 1 — heading mostly into wind | 1 |
+| Broad reach | 2 — heading mostly with wind | 2 |
+| Running | 3 — heading directly with wind | 3 |
 
-A ship in irons receives 1 AP but may only spend it on a cannon attack, not on moving further into the wind. This allows return fire without allowing upwind movement.
+A ship in irons may only spend its 1 AP on a cannon attack, not on forward movement. Beam reach does not exist as a discrete point of sail — the hex grid produces only close reach and broad reach as the two intermediate positions.
 
-Wind direction is displayed as a compass rose in the UI.
+Wind direction is displayed as a compass rose in the UI. Ship heading is stored as a direction index (0–5) and updated on every move.
 
 ### Fog of War
 
