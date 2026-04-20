@@ -94,8 +94,7 @@ This simplification keeps the renderer flat and unambiguous — every hex is the
 
 | Type | Description | Gameplay Effect |
 |---|---|---|
-| `ocean` | Open water | Ships navigate; crew cannot enter |
-| `coast` | Water hex adjacent to land | Ships navigate; crew embark/disembark across the coast-to-land boundary |
+| `ocean` | Open water | Ships navigate; crew embark/disembark at any ocean hex adjacent to land |
 | `grassland` | Open grassy terrain | Crew navigate; improvable into farm or wall |
 | `forest` | Forested land | Crew navigate; improvable into logging camp or wall |
 | `stone` | Rocky terrain | Crew navigate; improvable into wall; stone walls grant defensive bonus |
@@ -199,7 +198,6 @@ Each terrain type has a dedicated SVG file in `src/assets/terrain/`. SVGs are lo
 | Terrain Type | Asset File |
 |---|---|
 | Ocean | `terrain/ocean.svg` |
-| Coast | `terrain/coast.svg` |
 | Grassland | `terrain/grassland.svg` |
 | Forest | `terrain/forest.svg` |
 | Stone | `terrain/stone.svg` |
@@ -322,4 +320,4 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-18 | Localization via externalized string modules | No raw strings in UI code; RTL support via CSS logical properties; English only currently but architecture is translation-ready |
 | 2026-04-18 | QWEASDZXC default hex navigation keys | 3×3 key block mirrors hex geometry; 6 direction keys + wait; W and X unassigned; bindings are user-customizable via localStorage |
 | 2026-04-18 | Closed-loop detection replaces flood-fill enclosure | Simpler and more accurate to design intent; mountains participate as natural segments |
-| 2026-04-18 | Coast is a water hex; embarkation crosses land/coast boundary | Corrects prior misuse of "coastal" as a land type |
+| 2026-04-19 | Coast terrain type removed entirely | Embarkation is adjacency-based (any ocean hex next to land); separate coast type added complexity with no gameplay benefit; removed during Sprint 1B |

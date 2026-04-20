@@ -7,8 +7,7 @@ Every hex on the Windfall map has a terrain type. Terrain type determines which 
 
 | Terrain | Navigable By | Possible Improvements | Special Properties |
 |---|---|---|---|
-| Ocean | Ships | None | Open water |
-| Coast | Ships | None | Crew embark and disembark across the coast-to-land boundary |
+| Ocean | Ships | None | Open water; crew embark and disembark at any ocean hex adjacent to land |
 | Grassland | Crew | Farm or Wall | Most common land type |
 | Forest | Crew | Logging Camp or Wall | |
 | Stone | Crew | Wall only | Stone walls grant a defensive bonus |
@@ -22,11 +21,7 @@ Each land hex may hold exactly one improvement. Choosing to build a wall on a gr
 
 ### Ocean
 
-Open water. Ships move freely. Crew cannot enter ocean hexes.
-
-### Coast
-
-Water hexes adjacent to land. Ships navigate coast hexes. Crew cross the boundary between a coast hex and an adjacent land hex to board or leave a ship. Coast hexes themselves cannot be improved.
+Open water. Ships move freely. Crew cannot enter ocean hexes directly — they must board or leave a ship. Embarkation and disembarkation happen across the boundary between any ocean hex and an adjacent land hex. There is no separate coast type; all water is ocean.
 
 ### Grassland
 

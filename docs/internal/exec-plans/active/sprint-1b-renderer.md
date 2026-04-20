@@ -85,6 +85,7 @@ Add a test to `tests/e2e/base-page.test.js`:
 | Date | Update |
 |---|---|
 | 2026-04-19 | Plan created. Ready for implementation. |
+| 2026-04-19 | Implementation complete. Renderer draws terrain with flat colors, starfield background with twinkling animation, mouse-drag pan. Coast terrain type removed during this sprint — embarkation is adjacency-based. Terrain noise tuned for convoluted coastlines, interior lakes, scattered biome clusters. All tests pass. |
 
 ## Decision Log
 
