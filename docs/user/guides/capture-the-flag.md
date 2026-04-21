@@ -1,51 +1,55 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
-# How to Capture the Flag
+# How to Reunite the Concordance
 
-Capturing the enemy flag and returning it safely to your fortification wins the game. This guide explains the full sequence.
+Capturing the enemy's Concordance half and carrying it back to your own wins the game. This guide explains the full sequence.
 
 ## Before You Begin
 
 To win the game, you need:
-- At least one live fortification
-- A crew member who can reach the enemy flag
-- A safe path from the flag's location back to your fortification
+- A secure hiding place for your own Concordance half
+- A crew member who can reach the enemy's half
+- A safe path from the enemy's half back to where yours is hidden
+
+Your own half's hiding location is your destination for the return journey. Choose it with both goals in mind: hard for the enemy to find, reachable by your carrier.
 
 ## Steps
 
-### 1. Find the Enemy Flag
+### 1. Hide Your Own Half
 
-The enemy flag is hidden somewhere on land. It does not appear at normal sight ranges — your crew must move to a hex directly adjacent to the flag's hex before it becomes visible.
+Before you go hunting, make sure your Concordance half is hidden somewhere defensible. Move a crew member carrying it onto a land hex and hide it there. Inside a live fortification is ideal — the fort's cannons will protect it if the enemy comes looking.
 
-Explore systematically. Move crew through land areas, especially near coastlines and areas with defensible terrain where your opponent might have chosen to build. When one of your crew is adjacent to the hidden flag, it appears on the map.
+### 2. Find the Enemy's Half
 
-### 2. Capture the Flag
+The enemy's half is hidden somewhere on land. It does not appear at normal sight ranges — your crew must move to a hex directly adjacent to its hex before it becomes visible.
 
-Move a crew member onto the hex containing the enemy flag. The capture is automatic — no additional action is required. That crew member is now the flag carrier.
+Explore systematically. Move crew through land areas, especially near coastlines and defensible terrain where your opponent might have settled. When one of your crew is adjacent to the hidden half, it appears on the map.
 
-### 3. Return the Flag
+### 3. Capture It
 
-Move the flag carrier to one of your live fortifications. The carrier moves like any other crew member, spending action points to move hex by hex.
+Move a crew member onto the hex containing the enemy's half. The capture is automatic — no additional action is required. That crew member is now the carrier.
 
-**This is the most dangerous part of the game.** If the flag carrier is destroyed while carrying the enemy flag, you lose immediately. Plan your route carefully:
+### 4. Return to Your Half
+
+Move the carrier to the same hex where you hid your own Concordance half. The carrier moves like any other crew member, spending action points hex by hex.
+
+**This is the most dangerous part of the game.** If the carrier is destroyed while holding the enemy's half, you lose immediately. Plan your route carefully:
 
 - Avoid hexes within cannon range of enemy fortifications.
 - Use your own ships and crew to escort the carrier.
-- If possible, move the carrier aboard a ship for faster travel across water.
+- Move the carrier aboard a ship for faster travel across water where possible.
 
-### 4. Deliver the Flag
+### 5. Reunite the Concordance
 
-When the flag carrier enters one of your live fortifications, you win the game.
+When the carrier reaches the hex containing your hidden half, both halves are together. The Concordance activates. You win.
 
-## Protecting Your Own Flag
+**Important:** Your own half must not be captured at the moment of reunion. If the enemy has taken it, recover it first.
 
-While pursuing the enemy flag, your opponent is pursuing yours. Make sure your flag is well-hidden and, if possible, inside a fortification defended by cannons. If the enemy captures your flag and you have no way to intercept their carrier, you will lose.
+## Protecting Your Own Half
 
-## Result
-
-The enemy flag reaches your fortification. The game ends with your victory.
+While you are pursuing the enemy's half, your opponent is pursuing yours. Keep it well-hidden and inside a fortification if possible. If the enemy captures your half and reunites it with their own before you can intercept, you lose.
 
 ## Related Topics
 
-- [The Flag](../concepts/flag.md)
+- [The Concordance](../concepts/flag.md)
 - [Fortifications](../concepts/fortifications.md)
 - [Crew and Ships](../concepts/units.md)

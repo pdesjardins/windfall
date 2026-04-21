@@ -177,11 +177,11 @@ Each player has one flag. Flag states:
 
 **Capturing enemy flag:** a player unit that moves onto the hex containing the enemy's hidden flag automatically captures it. Flag transitions to `captured`, carried by that unit.
 
-**Win condition:** the captured enemy flag reaches a live fortification belonging to the capturing player.
+**Win condition:** the captured enemy flag is carried to the same hex as the capturing player's own flag, while that flag is in `hidden` or `carried` state (not `captured`). This is the Concordance reunification — both halves on the same hex.
 
 **Loss conditions:**
-1. The player's flag is captured and reaches an enemy fortification.
-2. The unit carrying the enemy flag (in `captured` state) is destroyed — immediate loss.
+1. The enemy captures the player's flag and reunites it with their own flag on the same hex.
+2. The unit carrying the captured enemy flag is destroyed — immediate loss.
 
 ---
 
