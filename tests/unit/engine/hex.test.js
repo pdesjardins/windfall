@@ -12,12 +12,14 @@ export function runTests(assert) {
   assert('distance is symmetric', distance(3, 2, 7, 5) === distance(7, 5, 3, 2));
   assert('distance (0,0) to (3,0) is 3', distance(0, 0, 3, 0) === 3);
   assert('distance (0,0) to (0,3) is 3', distance(0, 0, 0, 3) === 3);
-  assert('distance (0,0) to (2,2) is 4', distance(0, 0, 2, 2) === 4);
+  assert('distance (0,0) to (2,2) is 3', distance(0, 0, 2, 2) === 3);
 
   // neighbors
   assert('neighbors returns 6 entries', neighbors(5, 5).length === 6);
-  assert('neighbor in direction 0 matches DIRECTIONS[0]',
-    JSON.stringify(neighbor(5, 5, 0)) === JSON.stringify([5 + DIRECTIONS[0][0], 5 + DIRECTIONS[0][1]]));
+  // Even-q col: offset delta matches axial delta for direction 0.
+  // Odd-q col: stagger shifts the result — axial delta alone is wrong.
+  assert('neighbor direction 0 from even-q column', JSON.stringify(neighbor(4, 5, 0)) === '[5,4]');
+  assert('neighbor direction 0 from odd-q column accounts for stagger', JSON.stringify(neighbor(5, 5, 0)) === '[6,5]');
   assert('each neighbor is distance 1 away', neighbors(5, 5).every(([q, r]) => distance(5, 5, q, r) === 1));
   assert('all 6 neighbor directions are unique', (() => {
     const ns = neighbors(0, 0).map(([q, r]) => `${q},${r}`);

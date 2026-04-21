@@ -5,36 +5,40 @@ Wind is one of the most important forces in Windfall. It affects how far your sh
 
 ## Wind Direction
 
-At any moment, wind blows in one of six directions across the entire map. The direction shifts gradually over the course of the game. A compass rose in the top bar shows the current wind direction at all times.
+At any moment, wind blows in one of six directions across the entire map — one direction for each face of a hex. Sailors name wind by where it comes **from**, not where it goes. A northerly wind blows from the north toward the south. The direction shifts gradually over the course of the game. A compass rose in the top bar shows the current wind direction at all times.
+
+## Heading
+
+Your ship always faces one of the same six directions. Heading is set by the direction of your last move and displayed on the ship marker. A ship that has not yet moved defaults to facing east.
 
 ## Points of Sail
 
-The angle between your ship's heading and the wind direction determines how many action points your ship receives that turn. Sailors call this the **point of sail**.
+**Point of sail** is the angle between your ship's heading and the wind's origin. Because both wind and heading use the six hex directions, there are exactly four possible relationships:
 
-| Point of Sail | Angle to Wind | Action Points |
+| Point of Sail | Steps from windward | Action Points |
 |---|---|---|
-| Running | With the wind | 3 |
-| Beam reach | Perpendicular to wind | 2 |
-| Close reach | Partly into the wind | 1 |
-| In irons | Directly into the wind | 1 (attack only) |
+| In irons | 0 — heading directly into wind | 1 (attack only) |
+| Close reach | 1 — heading mostly into wind | 1 |
+| Broad reach | 2 — heading mostly with wind | 2 |
+| Running | 3 — heading directly with wind | 3 |
 
-**Running** (wind at your back) is the fastest point of sail. A ship running downwind can move two hexes and still fire its cannons, or move three hexes without attacking.
+**In irons** is the worst position. Your bow points directly into the wind and you cannot make headway — the sails are useless. You can still fire your cannons, but you cannot move forward. Experienced sailors avoid getting caught in irons, especially in combat.
 
-**Beam reach** gives you two action points — move and attack, or move two hexes.
+**Close reach** is hard work. The wind pushes across the bow. You make slow progress and must choose between moving one hex or firing — not both.
 
-**Close reach** gives you one action point. You can move one hex or fire your cannons, but not both.
+**Broad reach** is a comfortable, fast point of sail. The wind comes from behind and to the side, filling the sails well. You can move two hexes or move and attack.
 
-**In irons** means the wind is directly in your face. You cannot move into the wind, but you can still fire your cannons. A ship in irons is not helpless — it can defend itself.
+**Running** (wind dead astern) is the fastest point of sail. With the wind directly behind you, you can cover three hexes or move two and still fire your guns.
 
 ## Strategic Implications
 
-Wind shapes every naval decision. A favored wind direction makes certain routes fast and others slow. An enemy approaching from downwind is moving quickly; one approaching from upwind is sluggish.
+Wind shapes every naval decision. A favorable wind direction makes certain routes fast and others slow. An enemy approaching from downwind is moving quickly; one approaching from upwind is sluggish and easy to outrun.
 
-Changing wind direction over time means no single position stays advantageous forever. A blockade that is easy to maintain with a favorable wind becomes costly when the wind shifts.
+Wind shifts gradually as the game progresses. A blockade that is easy to maintain with a favorable wind becomes costly when the wind backs against you. Patient sailors plan their positions with the next wind shift in mind.
 
 ## Crew on Land
 
-Crew are not affected by wind. They always receive 2 action points per turn regardless of wind direction.
+Crew are not affected by wind. They always receive 2 action points per turn regardless of conditions.
 
 ## Related Topics
 

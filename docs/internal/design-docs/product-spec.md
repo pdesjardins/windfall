@@ -7,6 +7,16 @@ Windfall is a turn-based nautical strategy game playable in a modern desktop bro
 
 The game is free to play. It is distributed as a static website. No account, server, or internet connection is required after the initial page load.
 
+### Narrative Premise
+
+The full backstory is in `docs/user/intro.md`. The short version for design purposes:
+
+A survey expedition has landed on Velanis, a beautiful sailing world. Two ships — *Resolution* (human crew) and *Accord* (synthetic crew) — were exploring together, each carrying one half of the **Concordance**: a paired resonance device that must be reunited to complete the mission. After a night of human irresponsibility, the synthetic crew of *Accord* sailed away in frustration, convinced they could finish the job without the humans. They cannot — the Concordance requires both halves to be brought together willingly.
+
+The player commands *Resolution*. The AI commands *Accord*.
+
+**The win condition follows from the lore:** both halves of the Concordance (both flags) must be brought to the same hex. The player wins by capturing the AI's Concordance half and carrying it to the location of their own hidden half — while their own half has not been captured. When the Concordance reunites, the synthetic crew's autonomy protocols reset and the mission succeeds. The AI wins by doing the same in reverse.
+
 ---
 
 ## Design Goals
@@ -16,6 +26,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 - **Abstracted, not realistic.** Production of crew and ships happens near grassland and forests without explicit resource counting. Being near the right terrain is sufficient. Exact quantities are tunable constants, not emergent from supply chains.
 - **Long sessions with save/resume.** A full game may span multiple real-world sessions. Players should be able to stop, think about their situation, and return.
 - **Tribute to early Civilization.** Fog of war, turn-based movement, fortification building, and terrain-based strategy are deliberate homages to that design tradition.
+- **Authentic nautical character.** Use sailing terminology wherever it applies — points of sail, in irons, windward and leeward, running before the wind. Nautical trivia and accurate sailing mechanics are part of the fun. When a design decision can go either way, prefer the choice that a sailor would recognize.
 
 ---
 
@@ -31,7 +42,7 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 ### Map
 
-- Hex grid using axial coordinates, approximately 200×150 hexes (~30,000 total). The large map supports long exploration arcs and keeps starting positions far apart.
+- Hex grid using even-q offset coordinates, 300×200 hexes (60,000 total). The large map supports long exploration arcs and keeps starting positions far apart.
 - Procedurally generated using multi-octave noise. Each game produces a unique map.
 - A heightmap is generated and used to classify terrain types, then discarded. Elevation is a generation-time tool only — it has no role in gameplay or rendering after classification.
 - Two elevation thresholds are applied using ridged multifractal noise: a water threshold (below → ocean) and a mountain threshold (above → mountain). Hexes between the thresholds become land, further classified into grassland, forest, or stone by a separate biome noise map. Stone is biome-determined so it scatters freely rather than forming elevation bands.
@@ -53,18 +64,18 @@ The game is free to play. It is distributed as a static website. No account, ser
 
 Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts gradually over the course of the game, rotating one step per N turns (N is a tunable constant).
 
-Wind affects ship movement through **points of sail** — the angle between a ship's heading and the wind direction:
+Both wind and ship heading use the six hex directions, giving exactly four possible relationships — four points of sail. Wind is named by where it comes **from** (windward convention).
 
-| Point of Sail | Directions | Ship AP |
+| Point of Sail | Steps from windward | Ship AP |
 |---|---|---|
-| Running (downwind) | 1 direction (with wind) | 3 |
-| Beam reach | 2 directions (60° off wind) | 2 |
-| Close reach | 2 directions (120° off wind) | 1 |
-| In irons (into wind) | 1 direction (against wind) | 1 — attack only, no movement into wind |
+| In irons | 0 — heading directly into wind | 1 (attack only) |
+| Close reach | 1 — heading mostly into wind | 1 |
+| Broad reach | 2 — heading mostly with wind | 2 |
+| Running | 3 — heading directly with wind | 3 |
 
-A ship in irons receives 1 AP but may only spend it on a cannon attack, not on moving further into the wind. This allows return fire without allowing upwind movement.
+A ship in irons may only spend its 1 AP on a cannon attack, not on forward movement. Beam reach does not exist as a discrete point of sail — the hex grid produces only close reach and broad reach as the two intermediate positions.
 
-Wind direction is displayed as a compass rose in the UI.
+Wind direction is displayed as a compass rose in the UI. Ship heading is stored as a direction index (0–5) and updated on every move.
 
 ### Fog of War
 
@@ -226,13 +237,13 @@ Each player has one flag. Flags are the central objective of the game.
 
 **Capturing the enemy flag:** A player crew unit that moves onto the hex containing the enemy's hidden flag automatically captures it. No additional action required.
 
-**Winning:** The player whose crew unit carries the captured enemy flag into one of their own live fortifications wins immediately.
+**Winning:** The player whose crew unit carries the captured enemy flag onto the same hex as their own hidden (or carried) flag wins immediately. Both halves of the Concordance must be on the same hex; the owning player's flag must not be in a `captured` state at that moment.
 
 **Losing (flag-related):**
-1. The AI captures the player's flag and returns it to an AI fortification.
-2. The player's crew unit carrying the captured enemy flag is destroyed — **immediate loss** (the flag is forfeit).
+1. The AI captures the player's flag and reunites it with its own flag.
+2. The player's crew unit carrying the captured enemy flag is destroyed — **immediate loss** (the captured flag is forfeit).
 
-The second loss condition creates maximum tension during the return journey.
+The second loss condition creates maximum tension during the return journey. The design consequence of the new win condition: the player's flag hiding location becomes the destination for the return trip, not an arbitrary fortification. Choosing a hiding spot that is both defensible and reachable becomes a meaningful strategic decision.
 
 ---
 
@@ -347,7 +358,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-18 | Fortification goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
 | 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary |
 | 2026-04-18 | Friendly forts allow embarkation at shore-adjacent wall hexes | Gates are assumed; enemy forts fire on approaching units and block disembarkation |
-| 2026-04-19 | Map size 200×150 (~30,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
+| 2026-04-19 | Map size 300×200 (60,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
 | 2026-04-19 | Wind system with points of sail (1–3 AP) | Authentic nautical mechanic; creates meaningful directional decisions without simulation complexity |
 | 2026-04-19 | In irons: 1 AP attack-only, no upwind movement | Ships can always return fire; cannot exploit wind to move upwind |
 | 2026-04-19 | Two-tier fortification: wall fires immediately, enclosure unlocks production | Any wall hex is tactically useful; enclosure rewards sustained building effort |

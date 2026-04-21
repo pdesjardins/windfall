@@ -51,21 +51,23 @@ src/
 
 ## Hex Grid
 
-Windfall uses an **axial coordinate system** (q, r) on a flat-top hex grid.
+Windfall uses **even-q offset coordinates** (column, row) on a flat-top hex grid. Even columns are not vertically shifted; odd columns shift down by half a hex height. This is the coordinate system used for terrain storage, fog arrays, and all `{q, r}` position objects throughout the codebase.
 
 **Canonical reference:** [redblobgames.com/grids/hexagons](https://www.redblobgames.com/grids/hexagons/) — all hex math must follow this reference. Do not invent alternative representations.
 
-**Map dimensions:** approximately 200 columns × 150 rows (~30,000 hexes). Exact dimensions are configurable constants in `hex.js`. Viewport culling ensures only visible hexes are rendered each frame.
+**Map dimensions:** 300 columns × 200 rows (60,000 hexes). Exact dimensions are configurable constants in `hex.js`. Viewport culling ensures only visible hexes are rendered each frame.
 
-**Neighbor directions** (flat-top axial):
+**Internal hex math:** `hex.js` stores direction vectors as axial deltas (`DIRECTIONS`) and converts to/from axial internally when computing neighbors and distances. Callers always work in even-q offset coordinates — the conversion is transparent. Do not apply `DIRECTIONS` deltas directly to offset coordinates; always use `neighbor()` or `neighbors()`.
+
+**Direction index table** (axial deltas used internally; visual angles computed from actual offset neighbors):
 ```
-Direction   Δq   Δr
-E           +1    0
-NE          +1   -1
-NW           0   -1
-W           -1    0
-SW          -1   +1
-SE           0   +1
+Index   Axial Δq  Axial Δr   Visual direction
+  0       +1        -1        NE (upper-right)
+  1       +1         0        SE (lower-right)
+  2        0        +1        S  (straight down)
+  3       -1        +1        SW (lower-left)
+  4       -1         0        NW (upper-left)
+  5        0        -1        N  (straight up)
 ```
 
 **Coordinate storage:** all hex coordinates are stored as `{q, r}` objects. Do not use arrays `[q, r]` — objects are more readable in save files and debug output.
@@ -122,6 +124,16 @@ Visibility is recalculated each turn after all unit moves.
 
 The enemy flag becomes visible when a player crew unit is directly adjacent to it (1 hex).
 
+**Rendering:** The starfield background is clipped to explored and visible hexes only. Undiscovered hexes and the area outside the map boundary render as solid black. Players discover the space scene by exploring to the map edge.
+
+**Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears on the canvas when active. This toggle is available at all times for design and testing work.
+
+## Ship State
+
+Each ship carries:
+- `q`, `r` — current hex position
+- `direction` — heading as a direction index (0–5), matching the `DIRECTIONS` array in `hex.js`. Updated on every move. Default on game start: 1 (East). Used by the renderer for the directional ship marker and will drive points-of-sail calculation when wind is implemented.
+
 ---
 
 ## Fortification System
@@ -165,11 +177,11 @@ Each player has one flag. Flag states:
 
 **Capturing enemy flag:** a player unit that moves onto the hex containing the enemy's hidden flag automatically captures it. Flag transitions to `captured`, carried by that unit.
 
-**Win condition:** the captured enemy flag reaches a live fortification belonging to the capturing player.
+**Win condition:** the captured enemy flag is carried to the same hex as the capturing player's own flag, while that flag is in `hidden` or `carried` state (not `captured`). This is the Concordance reunification — both halves on the same hex.
 
 **Loss conditions:**
-1. The player's flag is captured and reaches an enemy fortification.
-2. The unit carrying the enemy flag (in `captured` state) is destroyed — immediate loss.
+1. The enemy captures the player's flag and reunites it with their own flag on the same hex.
+2. The unit carrying the captured enemy flag is destroyed — immediate loss.
 
 ---
 
@@ -324,3 +336,6 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-19 | Ridged multifractal noise for elevation | Produces sharp mountain ridges, island silhouettes, and inland lake basins; standard fractal noise produced only rolling hills |
 | 2026-04-19 | Stone classified by biome noise, not elevation | Prevents stone from forming a ring around mountains; scatters it freely across all land as patches |
 | 2026-04-19 | Volcanic scatter pass for isolated mountains | Adds tactically interesting mountain formations near coastlines independent of elevation; creates natural fortification opportunities |
+| 2026-04-20 | Even-q offset coordinates (not pure axial) | Renderer uses even-q offset pixel formula to produce a rectangular map; pure axial pixel formula produces a parallelogram. All engine math converts offset↔axial internally via `toAxial`/`fromAxial` helpers in `hex.js`. Callers always use offset coords. |
+| 2026-04-20 | DIRECTION_ANGLES computed from actual offset neighbors | Raw axial deltas applied to `hexToPixel` give wrong pixel positions for directions 3 and 4, causing the ship marker to point the wrong way. Angles must be computed from the pixel position of the true offset neighbor. |
+| 2026-04-20 | Edge starfield revealed by circle clip at ship position | The starfield clip path is extended with a circle around each visible ship, so the space scene bleeds beyond the map boundary when the ship approaches the edge. Within the map, terrain draws on top and hides the circle; it only has visual effect in the void outside the map. |
