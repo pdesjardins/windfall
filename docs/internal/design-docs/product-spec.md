@@ -129,7 +129,9 @@ Crew are the player's land-based units. All crew are identical in capability.
 
 All ships are identical. A ship retains full capability until destroyed — there is no degraded state.
 
-**Action points:** Determined by wind and point of sail each turn (1–3 AP). See Wind section.
+**Action points:** Determined by wind and point of sail each turn (1–3 AP). See Wind section. Pre-wind placeholder: 1 AP per turn; moving 1 hex ends the turn. The Pass button skips ship movement without moving.
+
+**Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by fortifications draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool is defined in `src/js/engine/ships.js` when that module is introduced.
 
 **Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
@@ -141,6 +143,8 @@ All ships are identical. A ship retains full capability until destroyed — ther
 - Embark crew from an adjacent shore-adjacent land hex (1 AP)
 
 **Stacking:** Multiple friendly ships may occupy the same hex.
+
+**Capture:** A ship with 0 crew aboard is capturable. Enemy crew may board it by moving onto its hex (1 AP). Once any enemy crew boards, the ship's owner changes to the boarding faction — it flies a new flag and is now an enemy vessel. This means leaving a ship uncrewed near shore is a strategic risk. Recapture follows the same rule: board an uncrewed enemy ship to re-flag it.
 
 **Production:** A fortification that contains a wall hex adjacent to ocean and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent ocean hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
 
@@ -368,3 +372,4 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-19 | Ships retain full capability until destroyed (binary) | No degraded state tracking; consistent with "all ships identical" principle |
 | 2026-04-19 | Friendly crew stack freely; ships stack freely; enemies never share a hex | Stacks absorb hits naturally; contact with enemy always triggers combat |
 | 2026-04-19 | Flag hiding: any land hex the player can place a unit on | Excludes enemy-controlled hexes; includes friendly wall segments and interiors |
+| 2026-04-21 | Ships are capturable: boarding an uncrewed ship re-flags it | Creates strategic cost to leaving ships uncrewed near shore; consistent with "attack = movement" model; owner field on ship tracks current faction |

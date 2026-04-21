@@ -23,29 +23,17 @@ src/
     main.css              ← layout and global styles
     game.css              ← game canvas and HUD styles
   js/
-    main.js               ← initializes engine and UI; wires them together
+    main.js               ← game loop, click handling, selection state machine, auto-turn logic
     engine/
-      hex.js              ← hex grid math (coordinates, neighbors, distance, pathfinding)
+      hex.js              ← hex grid math (coordinates, neighbors, distance)
       terrain.js          ← procedural terrain generation and water flooding
       fog.js              ← fog of war: undiscovered / explored / visible state per hex
-      units.js            ← crew and ship unit state and movement rules
-      forts.js            ← fortification wall placement and enclosure detection
-      flags.js            ← flag state machine: carried / hidden / captured
-      ai.js               ← AI player turn logic
-      game.js             ← top-level game state, turn management, win/loss detection
-      save.js             ← JSON serialization and deserialization of game state
+      game.js             ← game state, unit actions, turn management
     ui/
-      renderer.js         ← canvas-based hex grid rendering
-      input.js            ← mouse and keyboard event handling; translates to engine calls
-      hud.js              ← turn counter, unit info panel, action buttons
-      dialogs.js          ← new game, save, load, win/loss modals
-    locale/               ← string resources; one module per language
-      en.js               ← English strings (default; only language currently)
-    settings.js           ← key binding defaults and user configuration
-  assets/
-    terrain/              ← SVG files for terrain hex rendering (one per terrain type)
-    sprites/              ← PNG files for unit and flag sprites
+      renderer.js         ← canvas rendering: terrain, fog, ships, crew, selection highlights
 ```
+
+Modules listed without a file do not yet exist. They will be added in future sprints as the features they serve are implemented.
 
 ---
 
@@ -128,11 +116,53 @@ The enemy flag becomes visible when a player crew unit is directly adjacent to i
 
 **Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears on the canvas when active. This toggle is available at all times for design and testing work.
 
-## Ship State
+## Unit State
+
+### Ship
 
 Each ship carries:
-- `q`, `r` — current hex position
-- `direction` — heading as a direction index (0–5), matching the `DIRECTIONS` array in `hex.js`. Updated on every move. Default on game start: 1 (East). Used by the renderer for the directional ship marker and will drive points-of-sail calculation when wind is implemented.
+
+| Field | Type | Description |
+|---|---|---|
+| `q`, `r` | number | Current hex position |
+| `direction` | 0–5 | Heading as a direction index; updated on every move; default 1 (SE) |
+| `owner` | `'human'` \| `'ai'` | Controlling faction; flips on capture |
+| `ap` | number | Action points remaining this turn; reset to `SHIP_AP` (currently 1) on `endPlayerTurn` |
+
+A ship with `ap === 0` is rendered at 35% opacity and shows no highlighted move targets. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of AP.
+
+Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
+
+### Crew
+
+Each crew unit carries:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | number | Stable identity (0-indexed) |
+| `aboard` | boolean | `true` = on ship; `false` = on land |
+| `q`, `r` | number \| null | Position when on land; `null` when aboard |
+| `ap` | number | Action points remaining this turn; reset to `CREW_AP` (2) on `endPlayerTurn` |
+
+Crew with `ap === 0` are rendered at 35% opacity and cannot be selected.
+
+**Aboard crew** contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). While the ship has `ap === 0`, no disembark targets are highlighted (ship must have AP to advertise actions); the mechanical disembark action itself does not consume ship AP.
+
+**Land crew** move independently on land hexes (not ocean, not mountain). Each move costs 1 AP. Moving onto the ship's hex embarks the crew (1 AP).
+
+---
+
+## Turn Structure
+
+Each player turn proceeds as follows:
+
+1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, all units re-reveal their sight range, AP resets for all units, turn counter increments.
+2. **Auto-select** — the ship is automatically selected and move targets highlighted.
+3. **Player actions** — any order: move ship (1 AP), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP).
+4. **Auto-end detection** — after each action, the engine checks whether all options are exhausted (`ship.ap === 0` and no land crew with `ap > 0`). If so, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms.
+5. **Pass** — the player may end the turn early at any time by clicking Pass. This cancels any pending auto-end timer.
+
+**Fog timing:** `moveShip` and `moveCrew` call `setVisible` immediately, accumulating revealed hexes during the turn. The visible→explored sweep runs only in `endPlayerTurn`, so players see the full extent of their moves before the fog dims.
 
 ---
 
@@ -339,3 +369,9 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-20 | Even-q offset coordinates (not pure axial) | Renderer uses even-q offset pixel formula to produce a rectangular map; pure axial pixel formula produces a parallelogram. All engine math converts offset↔axial internally via `toAxial`/`fromAxial` helpers in `hex.js`. Callers always use offset coords. |
 | 2026-04-20 | DIRECTION_ANGLES computed from actual offset neighbors | Raw axial deltas applied to `hexToPixel` give wrong pixel positions for directions 3 and 4, causing the ship marker to point the wrong way. Angles must be computed from the pixel position of the true offset neighbor. |
 | 2026-04-20 | Edge starfield revealed by circle clip at ship position | The starfield clip path is extended with a circle around each visible ship, so the space scene bleeds beyond the map boundary when the ship approaches the edge. Within the map, terrain draws on top and hides the circle; it only has visual effect in the void outside the map. |
+| 2026-04-21 | Ship has AP (SHIP_AP = 1); moving spends it; does not auto-end turn | Unifies ship and crew under the same AP model. Ship fades at 0 AP. Turn ends via Pass or auto-end when all units are spent. Wind will raise SHIP_AP to 1–3 without changing the model. |
+| 2026-04-21 | 0 AP = 0 highlighted targets, for all unit types | Highlighted hexes represent actionable moves. A spent unit shows no options — not move hexes, not disembark hexes. Player can still select a spent unit to read its info panel. |
+| 2026-04-21 | Auto-end turn after 800 ms when all options are spent | Eliminates a mandatory Pass click at the end of turns where the player has used everything. Timer is cancellable by clicking Pass, ensuring no double-advance. |
+| 2026-04-21 | Auto-select ship at turn start | Removes one mandatory click per turn. Ship is always the first unit with options at turn start; auto-selecting it and showing targets is the natural starting state. |
+| 2026-04-21 | Fog timing: visible→explored deferred to endPlayerTurn | Players see the full extent of their moves (accumulated setVisible calls) before the fog dims. This gives informational feedback within the turn rather than immediately after each move. |
+| 2026-04-21 | Ship flag pennant replaces crew count badge | A colored pennant (human: cream, AI: teal) communicates crew presence without a number. Absence of flag = uncrewed = capturable. Numeric crew count is available in the info panel on selection. |

@@ -59,9 +59,10 @@ let _mapHeight   = 0;
 let _camera      = { x: 0, y: 0 };
 let _stars       = [];
 let _animFrameId = null;
-let _devFogOff   = false;
-let _selected    = false;
+let _devFogOff    = false;
+let _selection    = null; // null | { type: 'ship' } | { type: 'crew', id: number }
 let _validTargets = []; // array of {q, r}
+let _crew         = [];
 
 function buildStars(w, h) {
   const stars = [];
@@ -86,6 +87,25 @@ function drawHexPath(ctx, corners) {
   ctx.moveTo(corners[0][0], corners[0][1]);
   for (let i = 1; i < 6; i++) ctx.lineTo(corners[i][0], corners[i][1]);
   ctx.closePath();
+}
+
+// Draw a mast + pennant flag above the ship's hex center
+function drawFlag(ctx, cx, cy, color) {
+  const mastTop = cy - HEX_SIZE * 0.55;
+  const mastBot = cy - HEX_SIZE * 0.15;
+  ctx.beginPath();
+  ctx.moveTo(cx, mastBot);
+  ctx.lineTo(cx, mastTop);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, mastTop);
+  ctx.lineTo(cx + HEX_SIZE * 0.30, mastTop + HEX_SIZE * 0.10);
+  ctx.lineTo(cx, mastTop + HEX_SIZE * 0.22);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
 // Draw a triangle ship marker oriented toward the given direction index
@@ -145,14 +165,23 @@ function drawFrame(timestamp) {
       _ctx.closePath();
     }
   }
-  // Circle reveal at each visible ship — extends beyond map boundary
-  const edgeRadius = HEX_SIZE * 3 * 2;
+  // Circle reveal at each visible ship and land crew — extends beyond map boundary
+  const shipEdgeR = HEX_SIZE * 3 * 2;
+  const crewEdgeR = HEX_SIZE * 2 * 2;
   for (const ship of _ships) {
     const fs = _devFogOff ? VISIBLE : (_fog ? _fog[ship.r * _mapWidth + ship.q] : VISIBLE);
     if (fs !== VISIBLE) continue;
     const { x, y } = hexToPixel(ship.q, ship.r, _camera);
-    _ctx.moveTo(x + edgeRadius, y);
-    _ctx.arc(x, y, edgeRadius, 0, Math.PI * 2);
+    _ctx.moveTo(x + shipEdgeR, y);
+    _ctx.arc(x, y, shipEdgeR, 0, Math.PI * 2);
+  }
+  for (const c of _crew) {
+    if (c.aboard) continue;
+    const fs = _devFogOff ? VISIBLE : (_fog ? _fog[c.r * _mapWidth + c.q] : VISIBLE);
+    if (fs !== VISIBLE) continue;
+    const { x, y } = hexToPixel(c.q, c.r, _camera);
+    _ctx.moveTo(x + crewEdgeR, y);
+    _ctx.arc(x, y, crewEdgeR, 0, Math.PI * 2);
   }
   _ctx.clip();
   _ctx.fillStyle = '#05080f';
@@ -224,7 +253,7 @@ function drawFrame(timestamp) {
     if (fogState !== VISIBLE) continue;
 
     // Selection ring
-    if (_selected) {
+    if (_selection?.type === 'ship') {
       const corners = hexCorners(x, y, HEX_SIZE);
       drawHexPath(_ctx, corners);
       _ctx.strokeStyle = '#e8d5b0';
@@ -232,7 +261,42 @@ function drawFrame(timestamp) {
       _ctx.stroke();
     }
 
-    drawShipMarker(_ctx, x, y, ship.direction ?? 1, '#e8d5b0');
+    const shipColor = ship.owner === 'ai' ? '#4aacbe' : '#e8d5b0';
+    _ctx.save();
+    _ctx.globalAlpha = (ship.ap === 0) ? 0.35 : 1.0;
+    drawShipMarker(_ctx, x, y, ship.direction ?? 1, shipColor);
+    const aboardCount = _crew.filter(c => c.aboard).length;
+    if (aboardCount > 0) drawFlag(_ctx, x, y, shipColor);
+    _ctx.restore();
+  }
+
+  // Crew on land
+  for (const c of _crew) {
+    if (c.aboard) continue;
+    const { x, y } = hexToPixel(c.q, c.r, _camera);
+    if (x + HEX_HALF_W < 0 || x - HEX_HALF_W > w) continue;
+    if (y + HEX_HALF_H < 0 || y - HEX_HALF_H > h) continue;
+    const fogState = _devFogOff ? VISIBLE : (_fog ? _fog[c.r * _mapWidth + c.q] : VISIBLE);
+    if (fogState !== VISIBLE) continue;
+
+    const isSelected = _selection?.type === 'crew' && _selection.id === c.id;
+    const spent      = c.ap === 0;
+
+    if (isSelected) {
+      const corners = hexCorners(x, y, HEX_SIZE);
+      drawHexPath(_ctx, corners);
+      _ctx.strokeStyle = '#e8d5b0';
+      _ctx.lineWidth = 2;
+      _ctx.stroke();
+    }
+
+    _ctx.beginPath();
+    _ctx.arc(x, y, HEX_SIZE * 0.22, 0, Math.PI * 2);
+    _ctx.fillStyle = spent ? 'rgba(232,213,176,0.35)' : '#e8d5b0';
+    _ctx.fill();
+    _ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    _ctx.lineWidth = 1;
+    _ctx.stroke();
   }
 
   // Dev mode indicator
@@ -258,8 +322,9 @@ export function init(canvas, terrain, fog, ships, mapWidth, mapHeight) {
   _ships     = ships;
   _mapWidth  = mapWidth;
   _mapHeight = mapHeight;
-  _selected  = false;
+  _selection    = null;
   _validTargets = [];
+  _crew         = [];
 
   fitCanvas();
   _stars = buildStars(_canvas.width, _canvas.height);
@@ -296,8 +361,12 @@ export function updateShips(ships) {
   _ships = ships;
 }
 
-export function updateSelection(selected, validTargets) {
-  _selected     = selected;
+export function updateCrew(crew) {
+  _crew = crew;
+}
+
+export function updateSelection(selection, validTargets) {
+  _selection    = selection;
   _validTargets = validTargets;
 }
 

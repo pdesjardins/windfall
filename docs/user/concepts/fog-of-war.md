@@ -20,7 +20,7 @@ Your units reveal hexes within their sight range. Sight range is measured in hex
 - **Ships** reveal hexes within 3 hexes. A ship's mast provides height, allowing the crew to see further across open water.
 - **Crew on land** reveal hexes within 2 hexes.
 
-Visibility is recalculated at the start of each of your turns, after all unit moves are resolved.
+Visibility accumulates as you move. Each time a unit moves, the hexes it can see immediately become visible. At the end of your turn — when you press Pass or the game auto-ends — previously visible hexes outside the current sight ranges of all units transition to explored.
 
 ## Finding the Enemy Flag
 
