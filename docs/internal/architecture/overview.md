@@ -119,20 +119,24 @@ The enemy flag becomes visible when a player crew unit is directly adjacent to i
 
 ## Unit State
 
-### Ship
+### Ships Array
 
-Each ship carries:
+`game.ships` is an array of ship objects. Each ship carries:
 
 | Field | Type | Description |
 |---|---|---|
+| `id` | number | Stable identity assigned at creation; never reused |
 | `q`, `r` | number | Current hex position |
 | `direction` | 0–5 | Heading as a direction index; updated on every move; initialized to `seed % 6` (downwind) at game start |
 | `owner` | `'human'` \| `'ai'` | Controlling faction; flips on capture |
 | `ap` | number | Movement budget this turn; always reset to `SHIP_MOVE_BUDGET` (6) by `endPlayerTurn`; each hex move deducts `moveApCost(windDir, dirIndex)` |
+| `sleeping` | boolean | When `true`, the ship is anchored — excluded from the turn queue until the player explicitly clicks it |
 
-A ship with no reachable move targets is rendered at 35% opacity and shows no highlighted hexes. A ship in irons (`pointOfSail === 0`) has the windward hex blocked but can still move in all other directions. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of budget.
+A ship with no reachable move targets is rendered at 35% opacity. A sleeping ship is rendered at 50% opacity. A ship in irons (`pointOfSail === 0`) has the windward hex blocked but can still move in all other directions. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of budget.
 
 Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
+
+`game.nextShipId` is a monotonically increasing integer used to assign stable IDs when new ships are created (e.g. via fortification production).
 
 ### Crew
 
@@ -142,12 +146,14 @@ Each crew unit carries:
 |---|---|---|
 | `id` | number | Stable identity (0-indexed) |
 | `aboard` | boolean | `true` = on ship; `false` = on land |
+| `shipId` | number \| null | ID of the ship this crew member is aboard; `null` when on land |
 | `q`, `r` | number \| null | Position when on land; `null` when aboard |
-| `ap` | number | Action points remaining this turn; reset to `CREW_AP` (2) on `endPlayerTurn` |
+| `ap` | number | Action points remaining this turn; reset to `CREW_AP` (1) on `endPlayerTurn` |
+| `sleeping` | boolean | When `true`, the crew is encamped — excluded from the turn queue until the player explicitly clicks them |
 
-Crew with `ap === 0` are rendered at 35% opacity and cannot be selected.
+Crew with `ap === 0` are rendered at 35% opacity. Sleeping crew are rendered at 50% opacity.
 
-**Aboard crew** contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). While the ship has `ap === 0`, no disembark targets are highlighted (ship must have AP to advertise actions); the mechanical disembark action itself does not consume ship AP.
+**Aboard crew** contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). The mechanical disembark action does not consume ship AP.
 
 **Land crew** move independently on land hexes (not ocean, not mountain). Each move costs 1 AP. Moving onto the ship's hex embarks the crew (1 AP).
 
@@ -199,11 +205,17 @@ An SVG wind face (archaic cartographic style — puffed cheeks, five wind plumes
 
 Each player turn proceeds as follows:
 
-1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, turn counter increments, wind shifts (`windShift(seed, turn)`), ship AP is recalculated from the new wind direction, crew AP resets.
-2. **Auto-select** — the ship is automatically selected and move targets highlighted (or none if in irons).
-3. **Player actions** — any order: move ship (costs ship AP; blocked when in irons), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP).
-4. **Auto-end detection** — after each action, the engine checks whether all options are exhausted (`shipMoveTargets().length === 0` and no land crew with `ap > 0`). If so, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms.
-5. **Pass** — the player may end the turn early at any time by clicking Pass. This cancels any pending auto-end timer.
+1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, turn counter increments, wind shifts (`windShift(seed, turn)`), ship AP resets to `SHIP_MOVE_BUDGET`, crew AP resets to `CREW_AP`.
+2. **Unit queue built** — `buildTurnQueue()` produces an ordered `pendingUnits` array of `{ type, id }` descriptors. Ships come first (sorted by id), then land crew (sorted by id). Units are included only if they have remaining moves and are not sleeping.
+3. **Auto-select** — the first unit in `pendingUnits` is selected and the camera pans to it. Move targets are highlighted.
+4. **Player actions** — any order: move ship (costs ship AP; windward hex blocked), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP). After each action, if the active unit is exhausted it is removed from the queue; after a 250 ms pause the next queued unit is auto-selected with a smooth 350 ms animated camera pan.
+5. **Queue controls:**
+   - **Space** — skip the selected unit for this turn (removed from queue; does not return until next turn).
+   - **W** — wait (defer the selected unit to the end of the queue; other units act first).
+   - **F** — encamp/anchor (set `sleeping = true`; unit is removed from the queue permanently until the player clicks it to wake it).
+   - Clicking a sleeping unit wakes it (`sleeping = false`) and inserts it at the front of the queue if it has moves.
+6. **Auto-end detection** — when `pendingUnits` is empty, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms. The player may end the turn early at any time by clicking End Turn.
+7. **Mid-turn queue updates** — `afterAction()` scans for units that became eligible during the turn (e.g. crew just disembarked) and appends them to `pendingUnits`.
 
 **Fog timing:** `moveShip` and `moveCrew` call `setVisible` immediately, accumulating revealed hexes during the turn. The visible→explored sweep runs only in `endPlayerTurn`, so players see the full extent of their moves before the fog dims.
 
@@ -319,39 +331,25 @@ The project is localization-ready but ships only in English. Adding a language r
 
 ---
 
-## Key Binding System
+## Input Model
 
-The hex map is keyboard-navigable. The canvas element is focusable (`tabindex="0"`) and receives keyboard events when focused.
+The game is primarily mouse-driven. The canvas element handles clicks and drag-to-pan. Keyboard shortcuts supplement the mouse for queue management.
 
-### Hex Cursor Navigation
+### Controls
 
-For a flat-top hex grid, the six directions map to the QWEASDZXC key block:
+| Input | Action |
+|---|---|
+| Click unit | Select (or wake if sleeping and insert into queue) |
+| Click highlighted hex | Move selected unit |
+| Click and drag | Pan the map |
+| `Space` | Skip selected unit for this turn |
+| `W` | Wait — defer selected unit to end of queue |
+| `F` | Encamp / Anchor — sleep selected unit until explicitly woken |
+| `Ctrl+Shift+F` | Toggle fog of war off/on (dev mode) |
 
-```
-Q(NW)  W( — )  E(NE)
-A( W)  S(wait)  D( E)
-Z(SW)  X( — )  C(SE)
-```
+The full reference is in `docs/user/reference/keybindings.md`.
 
-`W` and `X` are unassigned (no corresponding flat-top hex direction). `S` is "wait" — pass the selected unit's turn without moving.
-
-### Key Binding Configuration
-
-Default bindings are defined in `src/js/settings.js` as a plain object:
-
-```javascript
-export const DEFAULT_KEYBINDINGS = {
-  hexNW: 'q', hexNE: 'e',
-  hexW:  'a', hexE:  'd',
-  hexSW: 'z', hexSE: 'c',
-  wait:  's',
-  confirm: 'Enter',
-  cancel:  'Escape',
-  endTurn: 'Return', // keyboard equivalent of End Turn button
-};
-```
-
-User customizations are stored in `localStorage` and merged over defaults at startup. The full reference is in `docs/user/reference/keybindings.md`.
+Key binding configuration (`src/js/settings.js`) and cursor-based hex navigation are described in earlier architecture drafts but have not been implemented. The cursor navigation model was superseded by click-to-move before Sprint 2.
 
 ---
 
@@ -421,3 +419,8 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-22 | Movement budget model replaces per-turn AP (SHIP_MOVE_BUDGET = 6) | Flat AP (1–3) let players take multiple close-reach steps in one turn, which should cost more than one running step. Budget with per-direction costs (running=2, broad=3, close=6, windward=Infinity) encodes the constraint correctly: 3 running moves, 2 broad-reach moves, or 1 close-reach move per turn. |
 | 2026-04-22 | In irons blocks only the windward hex, not all movement | Blocking all movement stranded the ship with no way to maneuver out. In irons is a heading relative to wind — the ship can turn and move in any non-windward direction. Only the single directly-upwind hex is blocked. |
 | 2026-04-22 | Ship starts facing downwind (direction = seed % 6 = windDir) | Guarantees maximum budget (3 running moves) at the start of every new game. Avoids the poor experience of loading a game and immediately being in irons or close reach. |
+| 2026-04-23 | Ships stored as array with stable `id` fields; crew tracks `shipId` | Anticipates multiple ships from fortification production. All engine functions take `shipId` as a parameter. Crew tracks which ship they are aboard by `shipId` so the relationship survives array reordering. |
+| 2026-04-23 | CREW_AP reduced from 2 to 1 | Two AP per crew gave an extra free move with no meaningful decision. One action per crew per turn creates a cleaner constraint and matches the "simple rules" design goal. |
+| 2026-04-23 | Unit selection queue (`pendingUnits`) with Space/W/F controls | Civ-style queue eliminates mandatory clicks on spent units. Space skips a unit for the turn. W defers it to end of queue. F puts it to sleep across turns (encamp/anchor). The queue auto-advances with a 250 ms pause and 350 ms animated camera pan so players can see where each unit moved before the camera jumps. |
+| 2026-04-23 | Sleeping units (`sleeping` flag) persist across turns until explicitly woken | Crew left on a scouted island and ships in harbor should not require a turn-pass every turn. Sleeping removes a unit from the queue permanently. Clicking the unit wakes it and re-inserts it into the queue. Visual: 50% opacity (distinct from 35% for spent-active). |
+| 2026-04-23 | `wakeUnit` always re-queues eligible units regardless of current sleeping state | Originally bailed out early if `!unit.sleeping`. This silently failed to re-queue units that were awake but had fallen out of `pendingUnits`. Always clearing sleeping and re-inserting when eligible is the safe behavior. |

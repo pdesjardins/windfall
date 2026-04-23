@@ -57,11 +57,12 @@ let _ships       = [];
 let _mapWidth    = 0;
 let _mapHeight   = 0;
 let _camera      = { x: 0, y: 0 };
+let _panAnim     = null; // { fromX, fromY, toX, toY, startTime, duration }
 let _stars       = [];
 let _animFrameId = null;
 let _devFogOff    = false;
-let _selection    = null; // null | { type: 'ship' } | { type: 'crew', id: number }
-let _validTargets = []; // array of {q, r}
+let _selection    = null;
+let _validTargets = [];
 let _crew         = [];
 
 function buildStars(w, h) {
@@ -138,6 +139,15 @@ function drawFrame(timestamp) {
   if (!_ctx) return;
 
   fitCanvas();
+
+  // Advance pan animation
+  if (_panAnim) {
+    const t    = Math.min(1, (timestamp - _panAnim.startTime) / _panAnim.duration);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out quad
+    _camera.x  = _panAnim.fromX + (_panAnim.toX - _panAnim.fromX) * ease;
+    _camera.y  = _panAnim.fromY + (_panAnim.toY - _panAnim.fromY) * ease;
+    if (t >= 1) { _camera.x = _panAnim.toX; _camera.y = _panAnim.toY; _panAnim = null; }
+  }
 
   const w = _canvas.width;
   const h = _canvas.height;
@@ -263,7 +273,7 @@ function drawFrame(timestamp) {
 
     const shipColor = ship.owner === 'ai' ? '#4aacbe' : '#e8d5b0';
     _ctx.save();
-    _ctx.globalAlpha = (ship.ap === 0) ? 0.35 : 1.0;
+    _ctx.globalAlpha = ship.sleeping ? 0.5 : (ship.ap === 0) ? 0.35 : 1.0;
     drawShipMarker(_ctx, x, y, ship.direction ?? 1, shipColor);
     const aboardCount = _crew.filter(c => c.aboard).length;
     if (aboardCount > 0) drawFlag(_ctx, x, y, shipColor);
@@ -292,7 +302,7 @@ function drawFrame(timestamp) {
 
     _ctx.beginPath();
     _ctx.arc(x, y, HEX_SIZE * 0.22, 0, Math.PI * 2);
-    _ctx.fillStyle = spent ? 'rgba(232,213,176,0.35)' : '#e8d5b0';
+    _ctx.fillStyle = c.sleeping ? 'rgba(232,213,176,0.5)' : spent ? 'rgba(232,213,176,0.35)' : '#e8d5b0';
     _ctx.fill();
     _ctx.strokeStyle = 'rgba(0,0,0,0.5)';
     _ctx.lineWidth = 1;
@@ -346,6 +356,7 @@ export function init(canvas, terrain, fog, ships, mapWidth, mapHeight) {
 export function render() {}
 
 export function pan(dx, dy) {
+  _panAnim = null; // cancel any in-progress animation on manual drag
   const margin    = 120;
   const mapPixelW = HEX_SIZE * 1.5 * (_mapWidth  - 1) + HEX_SIZE * 2;
   const mapPixelH = HEX_SIZE * SQRT3 * _mapHeight;
@@ -372,6 +383,39 @@ export function updateSelection(selection, validTargets) {
 
 export function setDevFog(disabled) {
   _devFogOff = disabled;
+}
+
+// Compute clamped camera position that centers hex (q, r) on screen.
+function clampedCenter(q, r) {
+  const { x, y } = hexToPixel(q, r, { x: 0, y: 0 });
+  const margin    = 120;
+  const mapPixelW = HEX_SIZE * 1.5 * (_mapWidth  - 1) + HEX_SIZE * 2;
+  const mapPixelH = HEX_SIZE * SQRT3 * _mapHeight;
+  return {
+    x: Math.max(margin - mapPixelW, Math.min(_canvas.width  - margin, _canvas.width  / 2 - x)),
+    y: Math.max(margin - mapPixelH, Math.min(_canvas.height - margin, _canvas.height / 2 - y)),
+  };
+}
+
+// Instantly center the camera on hex (q, r). Used for game init.
+export function centerOn(q, r) {
+  if (!_canvas) return;
+  _panAnim = null;
+  const c = clampedCenter(q, r);
+  _camera.x = c.x;
+  _camera.y = c.y;
+}
+
+// Smoothly pan the camera to center on hex (q, r) over `duration` ms.
+export function panTo(q, r, duration = 350) {
+  if (!_canvas) return;
+  const target = clampedCenter(q, r);
+  _panAnim = {
+    fromX: _camera.x, fromY: _camera.y,
+    toX: target.x,    toY: target.y,
+    startTime: performance.now(),
+    duration,
+  };
 }
 
 // Convert a canvas pixel position to the nearest hex {q, r}

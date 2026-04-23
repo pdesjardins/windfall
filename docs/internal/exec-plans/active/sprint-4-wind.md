@@ -281,6 +281,7 @@ Update sprint progress log and architecture overview (wind state shape, shift mo
 | 2026-04-22 | All steps implemented. 108 unit tests pass (0 failures). Canvas compass rose replaced by SVG wind face in right panel. Pending browser smoke test. |
 | 2026-04-22 | Movement model revised to budget-based (SHIP_MOVE_BUDGET=6, moveApCost per direction). In-irons behavior corrected: windward hex blocked only, other directions free. Ship starts facing downwind. 119 unit tests pass (0 failures). |
 | 2026-04-23 | All harness documents updated to reflect revised wind and movement model. |
+| 2026-04-23 | Implemented unit selection queue (pendingUnits, Space/W/F), auto-pan (250 ms pause + 350 ms animated camera), multiple ships (ships array, stable id, crew.shipId), CREW_AP reduced to 1, encamp/anchor (sleeping flag, 50% opacity, panel shows Anchored/Encamped). Bug fix: wakeUnit now always re-queues eligible units regardless of sleeping state; End Turn button now cancels pending advance timer. All harness documents updated. |
 
 ## Decision Log
 

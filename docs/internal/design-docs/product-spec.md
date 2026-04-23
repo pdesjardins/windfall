@@ -105,7 +105,7 @@ The enemy flag becomes visible only when a player unit is directly adjacent to i
 
 Crew are the player's land-based units. All crew are identical in capability.
 
-**Action points:** 2 per turn. Unaffected by wind.
+**Action points:** 1 per turn. Unaffected by wind.
 
 **Hit points:** 1. Any hit destroys a crew unit. A stack of crew on one hex absorbs hits one unit at a time — each hit kills one crew member, leaving survivors intact.
 
@@ -126,6 +126,8 @@ Crew are the player's land-based units. All crew are identical in capability.
 - A ship requires at least 1 crew aboard to move. A ship with 0 crew is inert.
 - Crew may not enter ocean hexes except via embarkation onto a ship.
 - Crew may not enter mountain hexes.
+
+**Encamp:** A crew unit may be ordered to encamp (F key). An encamped crew is excluded from the turn queue until the player explicitly clicks it to wake it. Encamped crew do not require turn-passes and do not trigger auto-end turn. An encamped crew adjacent to an enemy unit returns to normal queue participation automatically (implementation TBD).
 
 **Starting count:** TBD by playtesting. Initial value: 4 crew per player.
 
@@ -151,6 +153,8 @@ All ships are identical. A ship retains full capability until destroyed — ther
 **Capture:** A ship with 0 crew aboard is capturable. Enemy crew may board it by moving onto its hex (1 AP). Once any enemy crew boards, the ship's owner changes to the boarding faction — it flies a new flag and is now an enemy vessel. This means leaving a ship uncrewed near shore is a strategic risk. Recapture follows the same rule: board an uncrewed enemy ship to re-flag it.
 
 **Production:** A fortification that contains a wall hex adjacent to ocean and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent ocean hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
+
+**Anchor:** A ship may be ordered to anchor (F key). An anchored ship is excluded from the turn queue until the player explicitly clicks it to wake it. Anchored ships do not require turn-passes.
 
 **Destruction:** A destroyed ship is removed permanently. Crew aboard are lost.
 
