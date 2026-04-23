@@ -121,3 +121,27 @@
   background-color: #1a3028;
   border-color: #5a8a6a;
 }
+
+/* ── Wind display ── */
+
+#wind-display {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+#wind-face-wrapper {
+  transition: transform 0.6s ease;
+  transform-origin: 50% 50%;
+  opacity: 0.85;
+}
+
+#wind-label {
+  font-size: 0.78rem;
+  color: rgba(232, 213, 176, 0.65);
+  font-family: monospace;
+  letter-spacing: 0.08em;
+  margin: 0;
+  text-align: center;
+}

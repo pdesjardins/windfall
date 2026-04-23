@@ -21,31 +21,20 @@ src/
   index.html              ← entry point; loads all modules
   css/
     main.css              ← layout and global styles
-    game.css              ← game canvas and HUD styles
+    game.css              ← game canvas, HUD, and side panel styles
   js/
-    main.js               ← initializes engine and UI; wires them together
+    main.js               ← game loop, click handling, selection state machine, auto-turn logic, wind display
     engine/
-      hex.js              ← hex grid math (coordinates, neighbors, distance, pathfinding)
+      hex.js              ← hex grid math (coordinates, neighbors, distance)
       terrain.js          ← procedural terrain generation and water flooding
       fog.js              ← fog of war: undiscovered / explored / visible state per hex
-      units.js            ← crew and ship unit state and movement rules
-      forts.js            ← fortification wall placement and enclosure detection
-      flags.js            ← flag state machine: carried / hidden / captured
-      ai.js               ← AI player turn logic
-      game.js             ← top-level game state, turn management, win/loss detection
-      save.js             ← JSON serialization and deserialization of game state
+      wind.js             ← wind direction, point-of-sail AP, shift model (pure functions, no DOM)
+      game.js             ← game state, unit actions, turn management
     ui/
-      renderer.js         ← canvas-based hex grid rendering
-      input.js            ← mouse and keyboard event handling; translates to engine calls
-      hud.js              ← turn counter, unit info panel, action buttons
-      dialogs.js          ← new game, save, load, win/loss modals
-    locale/               ← string resources; one module per language
-      en.js               ← English strings (default; only language currently)
-    settings.js           ← key binding defaults and user configuration
-  assets/
-    terrain/              ← SVG files for terrain hex rendering (one per terrain type)
-    sprites/              ← PNG files for unit and flag sprites
+      renderer.js         ← canvas rendering: terrain, fog, ships, crew, selection highlights
 ```
+
+Modules listed without a file do not yet exist. They will be added in future sprints as the features they serve are implemented.
 
 ---
 
@@ -128,11 +117,107 @@ The enemy flag becomes visible when a player crew unit is directly adjacent to i
 
 **Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears on the canvas when active. This toggle is available at all times for design and testing work.
 
-## Ship State
+## Unit State
 
-Each ship carries:
-- `q`, `r` — current hex position
-- `direction` — heading as a direction index (0–5), matching the `DIRECTIONS` array in `hex.js`. Updated on every move. Default on game start: 1 (East). Used by the renderer for the directional ship marker and will drive points-of-sail calculation when wind is implemented.
+### Ships Array
+
+`game.ships` is an array of ship objects. Each ship carries:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | number | Stable identity assigned at creation; never reused |
+| `q`, `r` | number | Current hex position |
+| `direction` | 0–5 | Heading as a direction index; updated on every move; initialized to `seed % 6` (downwind) at game start |
+| `owner` | `'human'` \| `'ai'` | Controlling faction; flips on capture |
+| `ap` | number | Movement budget this turn; always reset to `SHIP_MOVE_BUDGET` (6) by `endPlayerTurn`; each hex move deducts `moveApCost(windDir, dirIndex)` |
+| `sleeping` | boolean | When `true`, the ship is anchored — excluded from the turn queue until the player explicitly clicks it |
+
+A ship with no reachable move targets is rendered at 35% opacity. A sleeping ship is rendered at 50% opacity. A ship in irons (`pointOfSail === 0`) has the windward hex blocked but can still move in all other directions. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of budget.
+
+Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
+
+`game.nextShipId` is a monotonically increasing integer used to assign stable IDs when new ships are created (e.g. via fortification production).
+
+### Crew
+
+Each crew unit carries:
+
+| Field | Type | Description |
+|---|---|---|
+| `id` | number | Stable identity (0-indexed) |
+| `aboard` | boolean | `true` = on ship; `false` = on land |
+| `shipId` | number \| null | ID of the ship this crew member is aboard; `null` when on land |
+| `q`, `r` | number \| null | Position when on land; `null` when aboard |
+| `ap` | number | Action points remaining this turn; reset to `CREW_AP` (1) on `endPlayerTurn` |
+| `sleeping` | boolean | When `true`, the crew is encamped — excluded from the turn queue until the player explicitly clicks them |
+
+Crew with `ap === 0` are rendered at 35% opacity. Sleeping crew are rendered at 50% opacity.
+
+**Aboard crew** contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). The mechanical disembark action does not consume ship AP.
+
+**Land crew** move independently on land hexes (not ocean, not mountain). Each move costs 1 AP. Moving onto the ship's hex embarks the crew (1 AP).
+
+---
+
+## Wind System
+
+Wind is a global direction (0–5, matching the hex direction index table) that shifts probabilistically each turn.
+
+### Wind State
+
+`game.wind = { dir }` — a single integer. No accumulated rotation is stored; the current direction is the only state needed. The shift is computed fresh each turn from `windShift(seed, turn)`, making wind fully reproducible from seed + turn count without additional save-file fields.
+
+### Movement Budget
+
+The ship receives `SHIP_MOVE_BUDGET = 6` movement points each turn. Each step costs `moveApCost(windDir, dirIndex)` points, which is `SHIP_MOVE_BUDGET / POINT_OF_SAIL_AP[pos]`:
+
+| Point of Sail | Steps from windward | Cost per hex | Max hexes from budget |
+|---|---|---|---|
+| In irons | 0 — heading directly into wind | Infinity (blocked) | 0 in windward direction |
+| Close reach | 1 — heading mostly into wind | 6 | 1 |
+| Broad reach | 2 — heading mostly with wind | 3 | 2 |
+| Running | 3 — heading directly with wind | 2 | 3 |
+
+"Steps from windward" is the minimum hex-direction angular distance between the move direction and the windward direction (opposite of `wind.dir`). Implemented in `wind.js` as `pointOfSail(windDir, moveDir)`.
+
+The cost model means a player can mix directions within a turn — for example, spend 3 pts on one broad-reach hex and 3 pts on a second broad-reach hex — as long as the total does not exceed the budget. `moveShip` deducts the exact cost of each step; the UI computes reachable hexes via Dijkstra weighted by `moveApCost`.
+
+### Shift Model
+
+At the start of each new turn (after `game.turn` increments), `windShift(seed, turn)` returns a facet delta drawn from:
+
+| Shift | Probability |
+|---|---|
+| 0 | 40% |
+| ±1 | 25% each |
+| ±2 | 4% each |
+| ±3 | 1% each |
+
+The hash function `windRng(seed, turn)` is a fast integer hash (not cryptographic). The same seed and turn always produce the same wind, ensuring reproducibility.
+
+### Wind Display
+
+An SVG wind face (archaic cartographic style — puffed cheeks, five wind plumes) sits in the right panel. Its CSS `transform: rotate(Xdeg)` is updated by `main.js` whenever wind changes. The angle lookup `WIND_CSS_ANGLE = [330, 30, 90, 150, 210, 270]` maps `wind.dir` to the CSS rotation that points the plumes toward the leeward direction. `WIND_NAMES = ['SW', 'NW', 'N', 'NE', 'SE', 'S']` gives the standard from-direction name for each `wind.dir` index.
+
+---
+
+## Turn Structure
+
+Each player turn proceeds as follows:
+
+1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, turn counter increments, wind shifts (`windShift(seed, turn)`), ship AP resets to `SHIP_MOVE_BUDGET`, crew AP resets to `CREW_AP`.
+2. **Unit queue built** — `buildTurnQueue()` produces an ordered `pendingUnits` array of `{ type, id }` descriptors. Ships come first (sorted by id), then land crew (sorted by id). Units are included only if they have remaining moves and are not sleeping.
+3. **Auto-select** — the first unit in `pendingUnits` is selected and the camera pans to it. Move targets are highlighted.
+4. **Player actions** — any order: move ship (costs ship AP; windward hex blocked), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP). After each action, if the active unit is exhausted it is removed from the queue; after a 250 ms pause the next queued unit is auto-selected with a smooth 350 ms animated camera pan.
+5. **Queue controls:**
+   - **Space** — skip the selected unit for this turn (removed from queue; does not return until next turn).
+   - **W** — wait (defer the selected unit to the end of the queue; other units act first).
+   - **F** — encamp/anchor (set `sleeping = true`; unit is removed from the queue permanently until the player clicks it to wake it).
+   - Clicking a sleeping unit wakes it (`sleeping = false`) and inserts it at the front of the queue if it has moves.
+6. **Auto-end detection** — when `pendingUnits` is empty, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms. The player may end the turn early at any time by clicking End Turn.
+7. **Mid-turn queue updates** — `afterAction()` scans for units that became eligible during the turn (e.g. crew just disembarked) and appends them to `pendingUnits`.
+
+**Fog timing:** `moveShip` and `moveCrew` call `setVisible` immediately, accumulating revealed hexes during the turn. The visible→explored sweep runs only in `endPlayerTurn`, so players see the full extent of their moves before the fog dims.
 
 ---
 
@@ -246,39 +331,25 @@ The project is localization-ready but ships only in English. Adding a language r
 
 ---
 
-## Key Binding System
+## Input Model
 
-The hex map is keyboard-navigable. The canvas element is focusable (`tabindex="0"`) and receives keyboard events when focused.
+The game is primarily mouse-driven. The canvas element handles clicks and drag-to-pan. Keyboard shortcuts supplement the mouse for queue management.
 
-### Hex Cursor Navigation
+### Controls
 
-For a flat-top hex grid, the six directions map to the QWEASDZXC key block:
+| Input | Action |
+|---|---|
+| Click unit | Select (or wake if sleeping and insert into queue) |
+| Click highlighted hex | Move selected unit |
+| Click and drag | Pan the map |
+| `Space` | Skip selected unit for this turn |
+| `W` | Wait — defer selected unit to end of queue |
+| `F` | Encamp / Anchor — sleep selected unit until explicitly woken |
+| `Ctrl+Shift+F` | Toggle fog of war off/on (dev mode) |
 
-```
-Q(NW)  W( — )  E(NE)
-A( W)  S(wait)  D( E)
-Z(SW)  X( — )  C(SE)
-```
+The full reference is in `docs/user/reference/keybindings.md`.
 
-`W` and `X` are unassigned (no corresponding flat-top hex direction). `S` is "wait" — pass the selected unit's turn without moving.
-
-### Key Binding Configuration
-
-Default bindings are defined in `src/js/settings.js` as a plain object:
-
-```javascript
-export const DEFAULT_KEYBINDINGS = {
-  hexNW: 'q', hexNE: 'e',
-  hexW:  'a', hexE:  'd',
-  hexSW: 'z', hexSE: 'c',
-  wait:  's',
-  confirm: 'Enter',
-  cancel:  'Escape',
-  endTurn: 'Return', // keyboard equivalent of End Turn button
-};
-```
-
-User customizations are stored in `localStorage` and merged over defaults at startup. The full reference is in `docs/user/reference/keybindings.md`.
+Key binding configuration (`src/js/settings.js`) and cursor-based hex navigation are described in earlier architecture drafts but have not been implemented. The cursor navigation model was superseded by click-to-move before Sprint 2.
 
 ---
 
@@ -339,3 +410,17 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-20 | Even-q offset coordinates (not pure axial) | Renderer uses even-q offset pixel formula to produce a rectangular map; pure axial pixel formula produces a parallelogram. All engine math converts offset↔axial internally via `toAxial`/`fromAxial` helpers in `hex.js`. Callers always use offset coords. |
 | 2026-04-20 | DIRECTION_ANGLES computed from actual offset neighbors | Raw axial deltas applied to `hexToPixel` give wrong pixel positions for directions 3 and 4, causing the ship marker to point the wrong way. Angles must be computed from the pixel position of the true offset neighbor. |
 | 2026-04-20 | Edge starfield revealed by circle clip at ship position | The starfield clip path is extended with a circle around each visible ship, so the space scene bleeds beyond the map boundary when the ship approaches the edge. Within the map, terrain draws on top and hides the circle; it only has visual effect in the void outside the map. |
+| 2026-04-21 | Ship has AP (SHIP_AP = 1); moving spends it; does not auto-end turn | Unifies ship and crew under the same AP model. Ship fades at 0 AP. Turn ends via Pass or auto-end when all units are spent. Wind will raise SHIP_AP to 1–3 without changing the model. |
+| 2026-04-21 | 0 AP = 0 highlighted targets, for all unit types | Highlighted hexes represent actionable moves. A spent unit shows no options — not move hexes, not disembark hexes. Player can still select a spent unit to read its info panel. |
+| 2026-04-21 | Auto-end turn after 800 ms when all options are spent | Eliminates a mandatory Pass click at the end of turns where the player has used everything. Timer is cancellable by clicking Pass, ensuring no double-advance. |
+| 2026-04-21 | Auto-select ship at turn start | Removes one mandatory click per turn. Ship is always the first unit with options at turn start; auto-selecting it and showing targets is the natural starting state. |
+| 2026-04-21 | Fog timing: visible→explored deferred to endPlayerTurn | Players see the full extent of their moves (accumulated setVisible calls) before the fog dims. This gives informational feedback within the turn rather than immediately after each move. |
+| 2026-04-21 | Ship flag pennant replaces crew count badge | A colored pennant (human: cream, AI: teal) communicates crew presence without a number. Absence of flag = uncrewed = capturable. Numeric crew count is available in the info panel on selection. |
+| 2026-04-22 | Movement budget model replaces per-turn AP (SHIP_MOVE_BUDGET = 6) | Flat AP (1–3) let players take multiple close-reach steps in one turn, which should cost more than one running step. Budget with per-direction costs (running=2, broad=3, close=6, windward=Infinity) encodes the constraint correctly: 3 running moves, 2 broad-reach moves, or 1 close-reach move per turn. |
+| 2026-04-22 | In irons blocks only the windward hex, not all movement | Blocking all movement stranded the ship with no way to maneuver out. In irons is a heading relative to wind — the ship can turn and move in any non-windward direction. Only the single directly-upwind hex is blocked. |
+| 2026-04-22 | Ship starts facing downwind (direction = seed % 6 = windDir) | Guarantees maximum budget (3 running moves) at the start of every new game. Avoids the poor experience of loading a game and immediately being in irons or close reach. |
+| 2026-04-23 | Ships stored as array with stable `id` fields; crew tracks `shipId` | Anticipates multiple ships from fortification production. All engine functions take `shipId` as a parameter. Crew tracks which ship they are aboard by `shipId` so the relationship survives array reordering. |
+| 2026-04-23 | CREW_AP reduced from 2 to 1 | Two AP per crew gave an extra free move with no meaningful decision. One action per crew per turn creates a cleaner constraint and matches the "simple rules" design goal. |
+| 2026-04-23 | Unit selection queue (`pendingUnits`) with Space/W/F controls | Civ-style queue eliminates mandatory clicks on spent units. Space skips a unit for the turn. W defers it to end of queue. F puts it to sleep across turns (encamp/anchor). The queue auto-advances with a 250 ms pause and 350 ms animated camera pan so players can see where each unit moved before the camera jumps. |
+| 2026-04-23 | Sleeping units (`sleeping` flag) persist across turns until explicitly woken | Crew left on a scouted island and ships in harbor should not require a turn-pass every turn. Sleeping removes a unit from the queue permanently. Clicking the unit wakes it and re-inserts it into the queue. Visual: 50% opacity (distinct from 35% for spent-active). |
+| 2026-04-23 | `wakeUnit` always re-queues eligible units regardless of current sleeping state | Originally bailed out early if `!unit.sleeping`. This silently failed to re-queue units that were awake but had fallen out of `pendingUnits`. Always clearing sleeping and re-inserting when eligible is the safe behavior. |

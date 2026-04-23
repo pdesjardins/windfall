@@ -4,6 +4,7 @@ import { runTests as hexTests } from './engine/hex.test.js';
 import { runTests as terrainTests } from './engine/terrain.test.js';
 import { runTests as fogTests } from './engine/fog.test.js';
 import { runTests as gameTests } from './engine/game.test.js';
+import { runTests as windTests } from './engine/wind.test.js';
 
 let passed = 0;
 let failed = 0;
@@ -40,6 +41,10 @@ fogTests(assert);
 // Sprint 2A: game state
 console.log('\nGame State (game.js)');
 gameTests(assert);
+
+// Sprint 4: wind
+console.log('\nWind (wind.js)');
+windTests(assert);
 
 console.log(`\n${passed} passed, ${failed} failed`);
 

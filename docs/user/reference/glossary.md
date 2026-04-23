@@ -74,3 +74,27 @@ A wall segment built on a stone hex. Stone walls provide an enhanced defensive r
 
 **wall segment**
 An improvement built by a crew unit on a grassland, forest, or stone hex over 5 turns. Wall segments, combined with mountain hexes, form closed loops that create live fortifications. One improvement per hex — a wall precludes other improvements on that hex. See [Fortifications](../concepts/fortifications.md).
+
+**wind**
+A global direction affecting ship movement each turn. Wind is named by where it comes from. The direction shifts gradually over the course of the game. See [Wind](../concepts/wind.md).
+
+**windward**
+The direction from which the wind blows. Moving directly into the wind (the windward hex) is always blocked. See [Wind](../concepts/wind.md).
+
+**leeward**
+The direction toward which the wind blows. A ship running before the wind is moving in the leeward direction. See [Wind](../concepts/wind.md).
+
+**point of sail**
+The angular relationship between a ship's heading and the wind direction. There are four points of sail on a hex grid: in irons (0 steps from windward), close reach (1 step), broad reach (2 steps), and running (3 steps). Each determines how far the ship can travel per turn. See [Wind](../concepts/wind.md).
+
+**in irons**
+A point of sail where the ship's heading points directly into the wind. The windward hex is blocked, but the ship can move freely in all other directions. See [Wind](../concepts/wind.md).
+
+**close reach**
+A point of sail one step off windward. The wind pushes across the bow; the ship can move one hex per turn. See [Wind](../concepts/wind.md).
+
+**broad reach**
+A point of sail two steps off windward. Wind fills the sails from behind and to the side; the ship can move two hexes per turn. See [Wind](../concepts/wind.md).
+
+**running**
+A point of sail with the wind directly astern (three steps from windward). Allows three hexes of movement per turn — the most available in this game. See [Wind](../concepts/wind.md).

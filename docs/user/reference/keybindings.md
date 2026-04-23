@@ -1,47 +1,30 @@
 <!-- SPDX-License-Identifier: CC-BY-4.0 -->
 # Keyboard Reference
 
-Windfall is fully playable by keyboard. The map uses a key block that mirrors the hex grid layout, and all game actions have keyboard equivalents.
-
-## Map Navigation
-
-The QWEASDZXC key block on your keyboard corresponds to the six directions of the hex grid:
-
-```
-Q(NW)  ·  E(NE)
-  A(W)  ·  D(E)
-Z(SW)  ·  C(SE)
-```
-
-Pressing a direction key moves the cursor one hex in that direction. The cursor highlights the selected hex. Press **Enter** or **Space** to confirm a selection or action.
-
-## Unit Actions
+## Unit Queue
 
 | Key | Action |
 |---|---|
-| `Q` | Move cursor north-west |
-| `E` | Move cursor north-east |
-| `A` | Move cursor west |
-| `D` | Move cursor east |
-| `Z` | Move cursor south-west |
-| `C` | Move cursor south-east |
-| `S` | Wait — pass the selected unit's turn without moving |
-| `Enter` | Confirm selection or action |
-| `Escape` | Cancel current selection or action |
+| `Space` | Skip — remove the selected unit from the queue for this turn |
+| `W` | Wait — defer the selected unit to the end of the queue |
+| `F` | Encamp / Anchor — put the selected unit to sleep until you wake it |
 
-## Game Controls
+Skipped units do not act again until the next turn. Encamped and anchored units persist across turns until you click them to wake them.
+
+## Map
 
 | Key | Action |
 |---|---|
-| `Shift+Enter` | End turn |
+| Click and drag | Pan the map |
 
-## Customizing Key Bindings
+## Developer
 
-Key bindings can be changed in the game settings. Your custom bindings are saved automatically and restored the next time you open the game.
-
-To reset all bindings to their defaults, select **Reset to Defaults** in the key binding settings.
+| Key | Action |
+|---|---|
+| `Ctrl+Shift+F` | Toggle fog of war off/on |
 
 ## Related Topics
 
-- [How to Start a New Game](../guides/start-a-new-game.md)
-- [What Is Windfall?](../concepts/what-is-windfall.md)
+- [Crew and Ships](../concepts/units.md)
+- [Fog of War](../concepts/fog-of-war.md)
+- [Glossary](glossary.md)

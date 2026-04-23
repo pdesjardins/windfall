@@ -57,11 +57,13 @@ let _ships       = [];
 let _mapWidth    = 0;
 let _mapHeight   = 0;
 let _camera      = { x: 0, y: 0 };
+let _panAnim     = null; // { fromX, fromY, toX, toY, startTime, duration }
 let _stars       = [];
 let _animFrameId = null;
-let _devFogOff   = false;
-let _selected    = false;
-let _validTargets = []; // array of {q, r}
+let _devFogOff    = false;
+let _selection    = null;
+let _validTargets = [];
+let _crew         = [];
 
 function buildStars(w, h) {
   const stars = [];
@@ -86,6 +88,25 @@ function drawHexPath(ctx, corners) {
   ctx.moveTo(corners[0][0], corners[0][1]);
   for (let i = 1; i < 6; i++) ctx.lineTo(corners[i][0], corners[i][1]);
   ctx.closePath();
+}
+
+// Draw a mast + pennant flag above the ship's hex center
+function drawFlag(ctx, cx, cy, color) {
+  const mastTop = cy - HEX_SIZE * 0.55;
+  const mastBot = cy - HEX_SIZE * 0.15;
+  ctx.beginPath();
+  ctx.moveTo(cx, mastBot);
+  ctx.lineTo(cx, mastTop);
+  ctx.strokeStyle = color;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx, mastTop);
+  ctx.lineTo(cx + HEX_SIZE * 0.30, mastTop + HEX_SIZE * 0.10);
+  ctx.lineTo(cx, mastTop + HEX_SIZE * 0.22);
+  ctx.closePath();
+  ctx.fillStyle = color;
+  ctx.fill();
 }
 
 // Draw a triangle ship marker oriented toward the given direction index
@@ -119,6 +140,15 @@ function drawFrame(timestamp) {
 
   fitCanvas();
 
+  // Advance pan animation
+  if (_panAnim) {
+    const t    = Math.min(1, (timestamp - _panAnim.startTime) / _panAnim.duration);
+    const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease-in-out quad
+    _camera.x  = _panAnim.fromX + (_panAnim.toX - _panAnim.fromX) * ease;
+    _camera.y  = _panAnim.fromY + (_panAnim.toY - _panAnim.fromY) * ease;
+    if (t >= 1) { _camera.x = _panAnim.toX; _camera.y = _panAnim.toY; _panAnim = null; }
+  }
+
   const w = _canvas.width;
   const h = _canvas.height;
   const t = timestamp / 1000;
@@ -145,14 +175,23 @@ function drawFrame(timestamp) {
       _ctx.closePath();
     }
   }
-  // Circle reveal at each visible ship — extends beyond map boundary
-  const edgeRadius = HEX_SIZE * 3 * 2;
+  // Circle reveal at each visible ship and land crew — extends beyond map boundary
+  const shipEdgeR = HEX_SIZE * 3 * 2;
+  const crewEdgeR = HEX_SIZE * 2 * 2;
   for (const ship of _ships) {
     const fs = _devFogOff ? VISIBLE : (_fog ? _fog[ship.r * _mapWidth + ship.q] : VISIBLE);
     if (fs !== VISIBLE) continue;
     const { x, y } = hexToPixel(ship.q, ship.r, _camera);
-    _ctx.moveTo(x + edgeRadius, y);
-    _ctx.arc(x, y, edgeRadius, 0, Math.PI * 2);
+    _ctx.moveTo(x + shipEdgeR, y);
+    _ctx.arc(x, y, shipEdgeR, 0, Math.PI * 2);
+  }
+  for (const c of _crew) {
+    if (c.aboard) continue;
+    const fs = _devFogOff ? VISIBLE : (_fog ? _fog[c.r * _mapWidth + c.q] : VISIBLE);
+    if (fs !== VISIBLE) continue;
+    const { x, y } = hexToPixel(c.q, c.r, _camera);
+    _ctx.moveTo(x + crewEdgeR, y);
+    _ctx.arc(x, y, crewEdgeR, 0, Math.PI * 2);
   }
   _ctx.clip();
   _ctx.fillStyle = '#05080f';
@@ -224,7 +263,7 @@ function drawFrame(timestamp) {
     if (fogState !== VISIBLE) continue;
 
     // Selection ring
-    if (_selected) {
+    if (_selection?.type === 'ship') {
       const corners = hexCorners(x, y, HEX_SIZE);
       drawHexPath(_ctx, corners);
       _ctx.strokeStyle = '#e8d5b0';
@@ -232,7 +271,42 @@ function drawFrame(timestamp) {
       _ctx.stroke();
     }
 
-    drawShipMarker(_ctx, x, y, ship.direction ?? 1, '#e8d5b0');
+    const shipColor = ship.owner === 'ai' ? '#4aacbe' : '#e8d5b0';
+    _ctx.save();
+    _ctx.globalAlpha = ship.sleeping ? 0.5 : (ship.ap === 0) ? 0.35 : 1.0;
+    drawShipMarker(_ctx, x, y, ship.direction ?? 1, shipColor);
+    const aboardCount = _crew.filter(c => c.aboard).length;
+    if (aboardCount > 0) drawFlag(_ctx, x, y, shipColor);
+    _ctx.restore();
+  }
+
+  // Crew on land
+  for (const c of _crew) {
+    if (c.aboard) continue;
+    const { x, y } = hexToPixel(c.q, c.r, _camera);
+    if (x + HEX_HALF_W < 0 || x - HEX_HALF_W > w) continue;
+    if (y + HEX_HALF_H < 0 || y - HEX_HALF_H > h) continue;
+    const fogState = _devFogOff ? VISIBLE : (_fog ? _fog[c.r * _mapWidth + c.q] : VISIBLE);
+    if (fogState !== VISIBLE) continue;
+
+    const isSelected = _selection?.type === 'crew' && _selection.id === c.id;
+    const spent      = c.ap === 0;
+
+    if (isSelected) {
+      const corners = hexCorners(x, y, HEX_SIZE);
+      drawHexPath(_ctx, corners);
+      _ctx.strokeStyle = '#e8d5b0';
+      _ctx.lineWidth = 2;
+      _ctx.stroke();
+    }
+
+    _ctx.beginPath();
+    _ctx.arc(x, y, HEX_SIZE * 0.22, 0, Math.PI * 2);
+    _ctx.fillStyle = c.sleeping ? 'rgba(232,213,176,0.5)' : spent ? 'rgba(232,213,176,0.35)' : '#e8d5b0';
+    _ctx.fill();
+    _ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+    _ctx.lineWidth = 1;
+    _ctx.stroke();
   }
 
   // Dev mode indicator
@@ -258,8 +332,9 @@ export function init(canvas, terrain, fog, ships, mapWidth, mapHeight) {
   _ships     = ships;
   _mapWidth  = mapWidth;
   _mapHeight = mapHeight;
-  _selected  = false;
+  _selection    = null;
   _validTargets = [];
+  _crew         = [];
 
   fitCanvas();
   _stars = buildStars(_canvas.width, _canvas.height);
@@ -281,6 +356,7 @@ export function init(canvas, terrain, fog, ships, mapWidth, mapHeight) {
 export function render() {}
 
 export function pan(dx, dy) {
+  _panAnim = null; // cancel any in-progress animation on manual drag
   const margin    = 120;
   const mapPixelW = HEX_SIZE * 1.5 * (_mapWidth  - 1) + HEX_SIZE * 2;
   const mapPixelH = HEX_SIZE * SQRT3 * _mapHeight;
@@ -296,13 +372,50 @@ export function updateShips(ships) {
   _ships = ships;
 }
 
-export function updateSelection(selected, validTargets) {
-  _selected     = selected;
+export function updateCrew(crew) {
+  _crew = crew;
+}
+
+export function updateSelection(selection, validTargets) {
+  _selection    = selection;
   _validTargets = validTargets;
 }
 
 export function setDevFog(disabled) {
   _devFogOff = disabled;
+}
+
+// Compute clamped camera position that centers hex (q, r) on screen.
+function clampedCenter(q, r) {
+  const { x, y } = hexToPixel(q, r, { x: 0, y: 0 });
+  const margin    = 120;
+  const mapPixelW = HEX_SIZE * 1.5 * (_mapWidth  - 1) + HEX_SIZE * 2;
+  const mapPixelH = HEX_SIZE * SQRT3 * _mapHeight;
+  return {
+    x: Math.max(margin - mapPixelW, Math.min(_canvas.width  - margin, _canvas.width  / 2 - x)),
+    y: Math.max(margin - mapPixelH, Math.min(_canvas.height - margin, _canvas.height / 2 - y)),
+  };
+}
+
+// Instantly center the camera on hex (q, r). Used for game init.
+export function centerOn(q, r) {
+  if (!_canvas) return;
+  _panAnim = null;
+  const c = clampedCenter(q, r);
+  _camera.x = c.x;
+  _camera.y = c.y;
+}
+
+// Smoothly pan the camera to center on hex (q, r) over `duration` ms.
+export function panTo(q, r, duration = 350) {
+  if (!_canvas) return;
+  const target = clampedCenter(q, r);
+  _panAnim = {
+    fromX: _camera.x, fromY: _camera.y,
+    toX: target.x,    toY: target.y,
+    startTime: performance.now(),
+    duration,
+  };
 }
 
 // Convert a canvas pixel position to the nearest hex {q, r}
