@@ -90,6 +90,90 @@ function drawHexPath(ctx, corners) {
   ctx.closePath();
 }
 
+// Terrain detail icons — sparse, low-contrast overlays drawn after the base hex fill.
+// `seed` is a position-derived integer so adjacent same-type hexes vary slightly.
+
+function drawTerrainOcean(ctx, cx, cy, size, seed) {
+  const s  = size * 0.30;
+  const oy = ((seed * 13 % 5) - 2) * size * 0.06;
+  ctx.save();
+  ctx.translate(cx, cy + oy);
+  ctx.rotate(-10 * Math.PI / 180);
+  ctx.beginPath();
+  ctx.moveTo(-s, 0);
+  ctx.bezierCurveTo(-s * 0.3, -s * 0.55,  s * 0.3, s * 0.55,  s, 0);
+  ctx.strokeStyle = 'rgba(100,185,220,0.50)';
+  ctx.lineWidth   = 0.9;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTerrainGrassland(ctx, cx, cy, size, seed) {
+  const count = 2 + (seed % 2);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-5 * Math.PI / 180);
+  ctx.strokeStyle = 'rgba(185,230,120,0.55)';
+  ctx.lineWidth   = 0.8;
+  for (let i = 0; i < count; i++) {
+    const ox = (i - (count - 1) / 2) * size * 0.24;
+    const by = size * 0.20;
+    const ty = -size * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(ox, by);
+    ctx.lineTo(ox, ty);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ox,               ty + size * 0.09);
+    ctx.lineTo(ox + size * 0.10, ty - size * 0.07);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTerrainForest(ctx, cx, cy, size, seed) {
+  const s = size * 0.21;
+  ctx.fillStyle = 'rgba(85,155,65,0.60)';
+  ctx.beginPath();
+  ctx.moveTo(cx,            cy - s);
+  ctx.lineTo(cx + s * 0.65, cy + s * 0.55);
+  ctx.lineTo(cx - s * 0.65, cy + s * 0.55);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawTerrainStone(ctx, cx, cy, size, seed) {
+  const bw = size * 0.24;
+  const bh = size * 0.13;
+  const g  = size * 0.04;
+  ctx.strokeStyle = 'rgba(190,175,155,0.55)';
+  ctx.lineWidth   = 0.7;
+  ctx.strokeRect(cx - bw - g, cy + g,       bw, bh); // bottom-left brick
+  ctx.strokeRect(cx + g,      cy + g,       bw, bh); // bottom-right brick
+  ctx.strokeRect(cx - bw / 2, cy - bh - g,  bw, bh); // top centered brick
+}
+
+function drawTerrainMountain(ctx, cx, cy, size, seed) {
+  const s = size * 0.28;
+  ctx.strokeStyle = 'rgba(165,148,128,0.60)';
+  ctx.lineWidth   = 0.9;
+
+  // Large background peak — left leg begins where it emerges above the small peak.
+  // The portion below that intersection is hidden behind the foreground triangle.
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.51, cy - s * 0.16);
+  ctx.lineTo(cx,             cy - s);
+  ctx.lineTo(cx + s * 0.90, cy + s * 0.50);
+  ctx.stroke();
+
+  // Smaller foreground peak shifted left; right leg cut ~75% down.
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 1.19, cy + s * 0.50);
+  ctx.lineTo(cx - s * 0.65, cy - s * 0.40);
+  ctx.lineTo(cx - s * 0.25, cy + s * 0.28);
+  ctx.stroke();
+}
+
 // Draw a mast + pennant flag above the ship's hex center
 function drawFlag(ctx, cx, cy, color) {
   const mastTop = cy - HEX_SIZE * 0.55;
@@ -233,6 +317,13 @@ function drawFrame(timestamp) {
       _ctx.strokeStyle = 'rgba(255,255,255,0.12)';
       _ctx.lineWidth = 0.5;
       _ctx.stroke();
+
+      const tseed = (q * 31 + r * 17) | 0;
+      if      (terrain === 'ocean')     drawTerrainOcean(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'grassland') drawTerrainGrassland(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'forest')    drawTerrainForest(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'stone')     drawTerrainStone(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'mountain')  drawTerrainMountain(_ctx, x, y, HEX_SIZE, tseed);
 
       if (fogState === EXPLORED) {
         drawHexPath(_ctx, corners);

@@ -287,35 +287,27 @@ AI sophistication is intentionally limited in the initial implementation. The AI
 
 ## Graphics and Assets
 
-Windfall uses a hybrid asset strategy:
+**Terrain hexes — canvas-drawn icons (current)**
+Each terrain type is rendered as a flat color fill with a small sparse icon drawn on top in `renderer.js`. Icons use thin strokes or small fills at roughly 50–70% opacity so they read as a signal without dominating the hex color. All drawing is done in the existing canvas render loop with no external assets.
 
-**Terrain hexes — SVG**
-Each terrain type has a dedicated SVG file in `src/assets/terrain/`. SVGs are loaded at startup, rasterized to an offscreen canvas at the current hex render size, and cached. Resizing the game window triggers a re-rasterization pass. This approach scales cleanly to any hex size and makes terrain skins trivially swappable — replacing a terrain type means replacing one SVG file.
-
-| Terrain Type | Asset File |
+| Terrain | Icon |
 |---|---|
-| Ocean | `terrain/ocean.svg` |
-| Grassland | `terrain/grassland.svg` |
-| Forest | `terrain/forest.svg` |
-| Stone | `terrain/stone.svg` |
-| Mountain | `terrain/mountain.svg` |
+| Ocean | S-curve wave (rotated 10° CCW to read horizontal) |
+| Grassland | 2–3 wheat stalks with grain-tip ticks (rotated 5° CCW) |
+| Forest | Single conifer triangle (centered, uniform across all forest hexes) |
+| Stone | Three staggered masonry bricks (two bottom, one centered on top) |
+| Mountain | Two-peak silhouette: small foreground peak (left) occludes the left leg of the large background peak |
 
-Fog states (explored, undiscovered) are applied as canvas compositing operations over the terrain SVG, not as separate assets.
+Icons are drawn before the fog overlay so explored hexes show dimmed versions. Position is seeded by `(q * 31 + r * 17) | 0` for stable per-hex variation without per-frame random calls.
 
-**Sprites — PNG**
-Crew, ships, and flags are PNG sprites in `src/assets/sprites/`. PNGs are authored at a fixed base resolution and scaled to fit the hex size at render time. A sprite sheet is not required initially — individual files per unit type are acceptable until the sprite count makes a sheet worthwhile.
+**Terrain hexes — SVG (planned)**
+The long-term target is a dedicated SVG file per terrain type, loaded at startup, rasterized to an offscreen canvas at the current hex size, and cached. Resizing triggers a re-rasterization pass. This approach makes terrain skins swappable without code changes. Not yet implemented — the canvas-drawn icons are the current shipping state.
 
-| Unit | Asset File |
-|---|---|
-| Crew (player) | `sprites/crew-player.png` |
-| Crew (AI) | `sprites/crew-ai.png` |
-| Ship (player) | `sprites/ship-player.png` |
-| Ship (AI) | `sprites/ship-ai.png` |
-| Flag (player) | `sprites/flag-player.png` |
-| Flag (AI) | `sprites/flag-ai.png` |
+**Sprites — PNG (planned)**
+Crew, ships, and flags are intended as PNG sprites in `src/assets/sprites/`. Currently rendered as canvas-drawn shapes directly in `renderer.js`. No external sprite assets exist yet.
 
 **Skinning**
-Swapping all terrain SVGs and sprite PNGs constitutes a complete visual skin. No code changes are required to change the visual theme. This makes designer contribution straightforward — assets are self-contained files with no build pipeline dependency.
+When SVG terrain and PNG sprites are implemented, swapping all assets constitutes a complete visual skin with no code changes required.
 
 ---
 
