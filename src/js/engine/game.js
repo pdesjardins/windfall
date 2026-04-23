@@ -2,6 +2,7 @@
 
 import { initFog, setVisible, endTurn } from './fog.js';
 import { neighbors, inBounds, hexToIndex } from './hex.js';
+import { windShift, applyShift, moveApCost, SHIP_MOVE_BUDGET } from './wind.js';
 
 export const SHIP_SIGHT_RANGE = 3;
 export const CREW_SIGHT_RANGE = 2;
@@ -19,17 +20,19 @@ const START_EDGE_MARGIN = 10;
 export function initGame(seed, terrain, width, height) {
   const fog        = initFog(width, height);
   const playerShip = findStartingOceanHex(terrain, width, height, seed);
-  playerShip.direction = 1;
-  playerShip.owner     = 'human';
-  playerShip.ap        = SHIP_AP;
+  playerShip.owner = 'human';
 
   const crew = Array.from({ length: CREW_COUNT }, (_, id) => ({
     id, aboard: true, q: null, r: null, ap: CREW_AP,
   }));
 
+  const windDir          = seed % 6;
+  playerShip.direction   = windDir; // start running downwind → full budget
+  playerShip.ap          = SHIP_MOVE_BUDGET;
+
   setVisible(fog, playerShip.q, playerShip.r, SHIP_SIGHT_RANGE, width, height);
 
-  return { seed, turn: 1, playerShip, crew, fog };
+  return { seed, turn: 1, playerShip, crew, fog, wind: { dir: windDir } };
 }
 
 // Move the player ship to an adjacent ocean hex.
@@ -37,11 +40,13 @@ export function initGame(seed, terrain, width, height) {
 export function moveShip(game, targetQ, targetR, terrain, width, height) {
   const { q, r } = game.playerShip;
 
-  if (game.playerShip.ap < 1) return null;
   if (!game.crew.some(c => c.aboard)) return null;
 
   const dirIndex = neighbors(q, r).findIndex(([nq, nr]) => nq === targetQ && nr === targetR);
   if (dirIndex === -1) return null;
+
+  const cost = moveApCost(game.wind.dir, dirIndex);
+  if (!isFinite(cost) || game.playerShip.ap < cost) return null;
 
   if (!inBounds(targetQ, targetR, width, height)) return null;
   if (terrain[hexToIndex(targetQ, targetR, width)] !== 'ocean') return null;
@@ -49,7 +54,7 @@ export function moveShip(game, targetQ, targetR, terrain, width, height) {
   game.playerShip.q         = targetQ;
   game.playerShip.r         = targetR;
   game.playerShip.direction = dirIndex;
-  game.playerShip.ap       -= 1;
+  game.playerShip.ap       -= cost;
 
   setVisible(game.fog, targetQ, targetR, SHIP_SIGHT_RANGE, width, height);
 
@@ -129,9 +134,10 @@ export function endPlayerTurn(game, width, height) {
     if (!c.aboard) setVisible(game.fog, c.q, c.r, CREW_SIGHT_RANGE, width, height);
   }
 
-  game.playerShip.ap = SHIP_AP;
+  game.turn     += 1;
+  game.wind.dir  = applyShift(game.wind.dir, windShift(game.seed, game.turn));
+  game.playerShip.ap = SHIP_MOVE_BUDGET;
   for (const c of game.crew) c.ap = CREW_AP;
-  game.turn += 1;
   return game;
 }
 

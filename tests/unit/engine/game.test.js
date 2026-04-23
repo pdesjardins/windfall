@@ -2,8 +2,9 @@
 
 import {
   initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn,
-  CREW_AP, CREW_COUNT, SHIP_AP, SHIP_SIGHT_RANGE,
+  CREW_AP, CREW_COUNT, SHIP_SIGHT_RANGE,
 } from '../../../src/js/engine/game.js';
+import { inIrons, SHIP_MOVE_BUDGET } from '../../../src/js/engine/wind.js';
 import { generateTerrain } from '../../../src/js/engine/terrain.js';
 import { MAP_WIDTH, MAP_HEIGHT, hexToIndex, distance, neighbors, neighbor, inBounds } from '../../../src/js/engine/hex.js';
 import { VISIBLE, EXPLORED, UNDISCOVERED } from '../../../src/js/engine/fog.js';
@@ -19,7 +20,7 @@ export function runTests(assert) {
   assert('initGame returns playerShip', typeof game.playerShip === 'object');
   assert('initGame returns fog array', game.fog instanceof Uint8Array);
   assert('playerShip has direction', typeof game.playerShip.direction === 'number');
-  assert('playerShip starts with full AP', game.playerShip.ap === SHIP_AP);
+  assert('playerShip starts with full move budget', game.playerShip.ap === SHIP_MOVE_BUDGET);
 
   // Starting position
   const { q, r } = game.playerShip;
@@ -199,5 +200,34 @@ export function runTests(assert) {
   endPlayerTurn(game9, MAP_WIDTH, MAP_HEIGHT);
   assert('endPlayerTurn increments turn counter', game9.turn === 2);
   assert('endPlayerTurn resets all crew AP', game9.crew.every(c => c.ap === CREW_AP));
-  assert('endPlayerTurn resets ship AP', game9.playerShip.ap === SHIP_AP);
+  assert('endPlayerTurn resets ship AP to full move budget',
+    game9.playerShip.ap === SHIP_MOVE_BUDGET);
+
+  // Wind integration
+  const gameW = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+  assert('initGame sets wind direction',
+    typeof gameW.wind.dir === 'number' && gameW.wind.dir >= 0 && gameW.wind.dir < 6);
+  assert('initGame sets ship AP to full move budget',
+    gameW.playerShip.ap === SHIP_MOVE_BUDGET);
+
+  // Windward hex is always blocked; non-windward hexes are reachable
+  const gameI       = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+  const windwardDir = (gameI.wind.dir + 3) % 6;
+  const windwardNeighbor = (() => {
+    const [wq, wr] = neighbors(gameI.playerShip.q, gameI.playerShip.r)[windwardDir];
+    return inBounds(wq, wr, MAP_WIDTH, MAP_HEIGHT) &&
+      terrain[hexToIndex(wq, wr, MAP_WIDTH)] === 'ocean'
+      ? { q: wq, r: wr } : null;
+  })();
+  if (windwardNeighbor) {
+    assert('moveShip returns null for windward hex',
+      moveShip(initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT),
+        windwardNeighbor.q, windwardNeighbor.r, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+  }
+  if (adjacentOcean && neighbors(gameI.playerShip.q, gameI.playerShip.r)
+      .findIndex(([nq, nr]) => nq === adjacentOcean.q && nr === adjacentOcean.r) !== windwardDir) {
+    gameI.playerShip.ap = SHIP_MOVE_BUDGET;
+    assert('moveShip succeeds for non-windward ocean hex',
+      moveShip(gameI, adjacentOcean.q, adjacentOcean.r, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
+  }
 }

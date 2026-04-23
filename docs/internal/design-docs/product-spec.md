@@ -62,20 +62,24 @@ The player commands *Resolution*. The AI commands *Accord*.
 
 ### Wind
 
-Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts gradually over the course of the game, rotating one step per N turns (N is a tunable constant).
+Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts probabilistically at the start of each turn: 40% chance of no change, 25% each for ±1 step, 4% each for ±2, 1% each for ±3. The shift is derived from a seeded hash of `(seed, turn)` — the same seed always produces the same wind sequence and the sequence is fully recoverable from seed + turn count alone.
 
 Both wind and ship heading use the six hex directions, giving exactly four possible relationships — four points of sail. Wind is named by where it comes **from** (windward convention).
 
-| Point of Sail | Steps from windward | Ship AP |
-|---|---|---|
-| In irons | 0 — heading directly into wind | 1 (attack only) |
-| Close reach | 1 — heading mostly into wind | 1 |
-| Broad reach | 2 — heading mostly with wind | 2 |
-| Running | 3 — heading directly with wind | 3 |
+The ship receives a movement budget of 6 points per turn. Each hex moved costs points based on the angle between the move direction and the wind:
 
-A ship in irons may only spend its 1 AP on a cannon attack, not on forward movement. Beam reach does not exist as a discrete point of sail — the hex grid produces only close reach and broad reach as the two intermediate positions.
+| Point of Sail | Steps from windward | Cost per hex | Hexes available |
+|---|---|---|---|
+| In irons | 0 — heading directly into wind | Infinity (blocked) | 0 in windward direction |
+| Close reach | 1 — heading mostly into wind | 6 | 1 |
+| Broad reach | 2 — heading mostly with wind | 3 | 2 |
+| Running | 3 — heading directly with wind | 2 | 3 |
 
-Wind direction is displayed as a compass rose in the UI. Ship heading is stored as a direction index (0–5) and updated on every move.
+A ship in irons has the single windward hex blocked but can move freely in all other directions. This is not a turn-long locked state — it describes the ship's current heading relative to the wind. Moving in any non-windward direction is always permitted. Beam reach does not exist as a discrete point of sail — the hex grid produces only close reach and broad reach as the two intermediate positions.
+
+The budget model allows mixed-direction moves within a turn (e.g., one broad-reach hex and three running hexes) as long as total cost does not exceed 6. The budget always resets to 6 at the start of each turn regardless of wind direction.
+
+Wind direction is displayed as an SVG wind face in the right panel. Ship heading is stored as a direction index (0–5) and updated on every move. At game start, the ship faces directly downwind (heading = leeward direction = `seed % 6`) to guarantee a full budget on the first turn.
 
 ### Fog of War
 
@@ -129,7 +133,7 @@ Crew are the player's land-based units. All crew are identical in capability.
 
 All ships are identical. A ship retains full capability until destroyed — there is no degraded state.
 
-**Action points:** Determined by wind and point of sail each turn (1–3 AP). See Wind section. Pre-wind placeholder: 1 AP per turn; moving 1 hex ends the turn. The Pass button skips ship movement without moving.
+**Movement budget:** 6 points per turn, always. Cost per hex is determined by the angle to the wind (see Wind section). Running costs 2 pts/hex (3 hexes available), broad reach costs 3 pts/hex (2 hexes), close reach costs 6 pts/hex (1 hex), windward direction is blocked. The End Turn button skips remaining movement.
 
 **Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by fortifications draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool is defined in `src/js/engine/ships.js` when that module is introduced.
 
@@ -320,7 +324,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 1. **Human turn:** The player takes all actions for their units. When satisfied, the player ends their turn.
 2. **AI turn:** The AI takes all actions for its units. When complete, the next human turn begins.
 
-**Action points:** Crew receive 2 AP per turn. Ships receive 1–3 AP per turn based on wind and point of sail (see Wind section).
+**Action points:** Crew receive 2 AP per turn. Ships receive a movement budget of 6 points per turn; usable distance varies by direction relative to wind (see Wind section).
 
 ---
 
@@ -373,3 +377,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-19 | Friendly crew stack freely; ships stack freely; enemies never share a hex | Stacks absorb hits naturally; contact with enemy always triggers combat |
 | 2026-04-19 | Flag hiding: any land hex the player can place a unit on | Excludes enemy-controlled hexes; includes friendly wall segments and interiors |
 | 2026-04-21 | Ships are capturable: boarding an uncrewed ship re-flags it | Creates strategic cost to leaving ships uncrewed near shore; consistent with "attack = movement" model; owner field on ship tracks current faction |
+| 2026-04-22 | Wind shift is probabilistic per-turn, not fixed interval | Feels more like real wind: usually steady, occasionally surprising. Fixed interval felt mechanical and predictable. 90% small/no change, 10% large shift. |
+| 2026-04-22 | Movement budget (6 pts) with per-direction costs, not flat per-turn AP | Flat AP allowed multiple close-reach steps per turn, which should be more expensive than running. Budget model correctly enforces 3 running, 2 broad-reach, or 1 close-reach move per turn, and allows mixed-direction turns. |
+| 2026-04-22 | In irons blocks only windward hex, not all movement | Blocking all movement stranded ships completely. In irons describes a heading relationship, not a turn-long locked state. The ship can always turn and move in non-windward directions. |
+| 2026-04-22 | Ship starts facing downwind | Guarantees 3 running moves at game start. Prevents the poor UX of loading a new game and being immediately in irons. |

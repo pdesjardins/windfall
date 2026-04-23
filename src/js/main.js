@@ -3,15 +3,25 @@
 import { generateTerrain } from './engine/terrain.js';
 import { MAP_WIDTH, MAP_HEIGHT, neighbors, inBounds, hexToIndex } from './engine/hex.js';
 import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn } from './engine/game.js';
+import { pointOfSail, moveApCost, SHIP_MOVE_BUDGET } from './engine/wind.js';
 import * as renderer from './ui/renderer.js';
 
-const canvas      = document.getElementById('game-canvas');
-const btnNewGame  = document.getElementById('btn-new-game');
-const btnSave     = document.getElementById('btn-save');
-const btnEndTurn  = document.getElementById('btn-end-turn');
-const elTurnNum    = document.getElementById('turn-number');
-const elUnitInfo   = document.getElementById('unit-info');
-const elStatusInfo = document.getElementById('status-info');
+const canvas        = document.getElementById('game-canvas');
+const btnNewGame    = document.getElementById('btn-new-game');
+const btnSave       = document.getElementById('btn-save');
+const btnEndTurn    = document.getElementById('btn-end-turn');
+const elTurnNum     = document.getElementById('turn-number');
+const elUnitInfo    = document.getElementById('unit-info');
+const elStatusInfo  = document.getElementById('status-info');
+const elWindWrapper = document.getElementById('wind-face-wrapper');
+const elWindLabel   = document.getElementById('wind-label');
+
+// Named for where wind comes FROM (standard convention).
+// wind.dir is the leeward index, so the windward source is (dir+3)%6.
+const WIND_NAMES     = ['SW', 'NW', 'N', 'NE', 'SE', 'S'];
+// Rotate the face so its plumes point toward the leeward direction (where wind goes).
+const WIND_CSS_ANGLE = [330, 30, 90, 150, 210, 270];
+const SAIL_NAMES     = ['In irons', 'Close reach', 'Broad reach', 'Running'];
 
 let game      = null;
 let terrain   = null;
@@ -64,16 +74,104 @@ function onBeforeUnload(e) {
 
 // --- helpers ---
 
+// Dijkstra path from ship to (targetQ, targetR), using moveApCost weights.
+// Returns array of {q,r} steps or null if unreachable within remaining budget.
+function findShipPath(targetQ, targetR) {
+  const { q: sq, r: sr } = game.playerShip;
+  const budget = game.playerShip.ap;
+
+  // dist map: index → cheapest cost to reach
+  const dist  = new Map([[hexToIndex(sq, sr, MAP_WIDTH), 0]]);
+  const prev  = new Map();
+  // min-heap via sorted array (small enough maps)
+  const queue = [[0, sq, sr]]; // [cost, q, r]
+
+  while (queue.length > 0) {
+    queue.sort((a, b) => a[0] - b[0]);
+    const [cost, cq, cr] = queue.shift();
+    if (cost > (dist.get(hexToIndex(cq, cr, MAP_WIDTH)) ?? Infinity)) continue;
+    if (cq === targetQ && cr === targetR) {
+      // reconstruct
+      const path = [];
+      let key = hexToIndex(targetQ, targetR, MAP_WIDTH);
+      while (prev.has(key)) {
+        const [pq, pr] = prev.get(key);
+        path.unshift({ q: pq === sq && pr === sr ? targetQ : pq, r: pq === sq && pr === sr ? targetR : pr });
+        key = hexToIndex(pq, pr, MAP_WIDTH);
+      }
+      // Simpler: rebuild from start
+      return reconstructPath(prev, sq, sr, targetQ, targetR);
+    }
+    const nbrs = neighbors(cq, cr);
+    for (let dir = 0; dir < 6; dir++) {
+      const stepCost = moveApCost(game.wind.dir, dir);
+      if (!isFinite(stepCost)) continue;
+      const [nq, nr] = nbrs[dir];
+      if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) continue;
+      if (terrain[hexToIndex(nq, nr, MAP_WIDTH)] !== 'ocean') continue;
+      const newCost = cost + stepCost;
+      if (newCost > budget) continue;
+      const idx = hexToIndex(nq, nr, MAP_WIDTH);
+      if (newCost < (dist.get(idx) ?? Infinity)) {
+        dist.set(idx, newCost);
+        prev.set(idx, [cq, cr]);
+        queue.push([newCost, nq, nr]);
+      }
+    }
+  }
+  return null;
+}
+
+function reconstructPath(prev, sq, sr, targetQ, targetR) {
+  const path = [];
+  let key = hexToIndex(targetQ, targetR, MAP_WIDTH);
+  const startKey = hexToIndex(sq, sr, MAP_WIDTH);
+  while (key !== startKey) {
+    const coords = coordsFromIndex(key);
+    path.unshift({ q: coords.q, r: coords.r });
+    const [pq, pr] = prev.get(key);
+    key = hexToIndex(pq, pr, MAP_WIDTH);
+  }
+  return path.length > 0 ? path : null;
+}
+
+function coordsFromIndex(idx) {
+  return { q: idx % MAP_WIDTH, r: Math.floor(idx / MAP_WIDTH) };
+}
+
 function shipMoveTargets() {
-  if (game.playerShip.ap < 1) return [];
   if (!game.crew.some(c => c.aboard)) return [];
-  const ship = game.playerShip;
-  return neighbors(ship.q, ship.r)
-    .filter(([q, r]) =>
-      inBounds(q, r, MAP_WIDTH, MAP_HEIGHT) &&
-      terrain[hexToIndex(q, r, MAP_WIDTH)] === 'ocean'
-    )
-    .map(([q, r]) => ({ q, r }));
+  const { q: sq, r: sr } = game.playerShip;
+  const budget  = game.playerShip.ap;
+  if (budget <= 0) return [];
+
+  const dist    = new Map([[hexToIndex(sq, sr, MAP_WIDTH), 0]]);
+  const queue   = [[0, sq, sr]];
+  const reachable = [];
+
+  while (queue.length > 0) {
+    queue.sort((a, b) => a[0] - b[0]);
+    const [cost, cq, cr] = queue.shift();
+    const key = hexToIndex(cq, cr, MAP_WIDTH);
+    if (cost > (dist.get(key) ?? Infinity)) continue;
+    const nbrs = neighbors(cq, cr);
+    for (let dir = 0; dir < 6; dir++) {
+      const stepCost = moveApCost(game.wind.dir, dir);
+      if (!isFinite(stepCost)) continue;
+      const [nq, nr] = nbrs[dir];
+      if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) continue;
+      if (terrain[hexToIndex(nq, nr, MAP_WIDTH)] !== 'ocean') continue;
+      const newCost = cost + stepCost;
+      if (newCost > budget) continue;
+      const idx = hexToIndex(nq, nr, MAP_WIDTH);
+      if (newCost < (dist.get(idx) ?? Infinity)) {
+        dist.set(idx, newCost);
+        reachable.push({ q: nq, r: nr });
+        queue.push([newCost, nq, nr]);
+      }
+    }
+  }
+  return reachable;
 }
 
 function disembarkTargets() {
@@ -122,7 +220,7 @@ function crewAtHex(q, r) {
 // Aboard crew are excluded: disembark requires ship AP, which is already 0.
 function allOptionsSpent() {
   if (!game) return false;
-  if (game.playerShip.ap > 0) return false;
+  if (shipMoveTargets().length > 0) return false;
   return !game.crew.some(c => !c.aboard && c.ap > 0);
 }
 
@@ -155,6 +253,17 @@ function syncRenderer() {
   renderer.updateFog(game.fog);
   renderer.updateShips([game.playerShip]);
   renderer.updateCrew(game.crew);
+  updateWindDisplay();
+}
+
+function updateWindDisplay() {
+  if (!game) return;
+  if (elWindWrapper) {
+    elWindWrapper.style.transform = `rotate(${WIND_CSS_ANGLE[game.wind.dir]}deg)`;
+  }
+  if (elWindLabel) {
+    elWindLabel.textContent = `${WIND_NAMES[game.wind.dir]} wind`;
+  }
 }
 
 function updatePanel() {
@@ -165,10 +274,14 @@ function updatePanel() {
     return;
   }
   if (selection.type === 'ship') {
-    const aboard = game.crew.filter(c => c.aboard).length;
+    const aboard   = game.crew.filter(c => c.aboard).length;
+    const pos      = pointOfSail(game.wind.dir, game.playerShip.direction);
+    const sailName = SAIL_NAMES[pos];
     elUnitInfo.innerHTML =
       `<p><strong>Resolution</strong></p>` +
-      `<p>Crew aboard: ${aboard} / ${game.crew.length}</p>`;
+      `<p>Crew: ${aboard} / ${game.crew.length}</p>` +
+      `<p>Wind: ${WIND_NAMES[game.wind.dir]}</p>` +
+      `<p>${sailName} — ${Math.floor(game.playerShip.ap / 2)} AP</p>`;
     return;
   }
   if (selection.type === 'crew') {
@@ -225,8 +338,13 @@ function handleClick(px, py) {
   if (selection.type === 'ship') {
     // Try to move ship to adjacent ocean hex (spends ship AP, does not end turn)
     if (terrain[hexToIndex(q, r, MAP_WIDTH)] === 'ocean') {
-      const result = moveShip(game, q, r, terrain, MAP_WIDTH, MAP_HEIGHT);
-      if (result) {
+      const targets = shipMoveTargets();
+      if (targets.some(t => t.q === q && t.r === r)) {
+        // Try direct move first; if not adjacent, path there automatically.
+        if (!moveShip(game, q, r, terrain, MAP_WIDTH, MAP_HEIGHT)) {
+          const path = findShipPath(q, r);
+          if (path) for (const step of path) moveShip(game, step.q, step.r, terrain, MAP_WIDTH, MAP_HEIGHT);
+        }
         syncRenderer();
         renderer.updateSelection(selection, [...shipMoveTargets(), ...disembarkTargets()]);
         updatePanel();
@@ -314,6 +432,7 @@ btnNewGame.addEventListener('click', () => {
 
   renderer.init(canvas, terrain, game.fog, [game.playerShip], MAP_WIDTH, MAP_HEIGHT);
   renderer.updateCrew(game.crew);
+  updateWindDisplay();
   autoSelect();
   setStatus('');
 

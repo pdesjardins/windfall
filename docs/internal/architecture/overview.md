@@ -21,13 +21,14 @@ src/
   index.html              ← entry point; loads all modules
   css/
     main.css              ← layout and global styles
-    game.css              ← game canvas and HUD styles
+    game.css              ← game canvas, HUD, and side panel styles
   js/
-    main.js               ← game loop, click handling, selection state machine, auto-turn logic
+    main.js               ← game loop, click handling, selection state machine, auto-turn logic, wind display
     engine/
       hex.js              ← hex grid math (coordinates, neighbors, distance)
       terrain.js          ← procedural terrain generation and water flooding
       fog.js              ← fog of war: undiscovered / explored / visible state per hex
+      wind.js             ← wind direction, point-of-sail AP, shift model (pure functions, no DOM)
       game.js             ← game state, unit actions, turn management
     ui/
       renderer.js         ← canvas rendering: terrain, fog, ships, crew, selection highlights
@@ -125,11 +126,11 @@ Each ship carries:
 | Field | Type | Description |
 |---|---|---|
 | `q`, `r` | number | Current hex position |
-| `direction` | 0–5 | Heading as a direction index; updated on every move; default 1 (SE) |
+| `direction` | 0–5 | Heading as a direction index; updated on every move; initialized to `seed % 6` (downwind) at game start |
 | `owner` | `'human'` \| `'ai'` | Controlling faction; flips on capture |
-| `ap` | number | Action points remaining this turn; reset to `SHIP_AP` (currently 1) on `endPlayerTurn` |
+| `ap` | number | Movement budget this turn; always reset to `SHIP_MOVE_BUDGET` (6) by `endPlayerTurn`; each hex move deducts `moveApCost(windDir, dirIndex)` |
 
-A ship with `ap === 0` is rendered at 35% opacity and shows no highlighted move targets. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of AP.
+A ship with no reachable move targets is rendered at 35% opacity and shows no highlighted hexes. A ship in irons (`pointOfSail === 0`) has the windward hex blocked but can still move in all other directions. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of budget.
 
 Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
 
@@ -152,14 +153,56 @@ Crew with `ap === 0` are rendered at 35% opacity and cannot be selected.
 
 ---
 
+## Wind System
+
+Wind is a global direction (0–5, matching the hex direction index table) that shifts probabilistically each turn.
+
+### Wind State
+
+`game.wind = { dir }` — a single integer. No accumulated rotation is stored; the current direction is the only state needed. The shift is computed fresh each turn from `windShift(seed, turn)`, making wind fully reproducible from seed + turn count without additional save-file fields.
+
+### Movement Budget
+
+The ship receives `SHIP_MOVE_BUDGET = 6` movement points each turn. Each step costs `moveApCost(windDir, dirIndex)` points, which is `SHIP_MOVE_BUDGET / POINT_OF_SAIL_AP[pos]`:
+
+| Point of Sail | Steps from windward | Cost per hex | Max hexes from budget |
+|---|---|---|---|
+| In irons | 0 — heading directly into wind | Infinity (blocked) | 0 in windward direction |
+| Close reach | 1 — heading mostly into wind | 6 | 1 |
+| Broad reach | 2 — heading mostly with wind | 3 | 2 |
+| Running | 3 — heading directly with wind | 2 | 3 |
+
+"Steps from windward" is the minimum hex-direction angular distance between the move direction and the windward direction (opposite of `wind.dir`). Implemented in `wind.js` as `pointOfSail(windDir, moveDir)`.
+
+The cost model means a player can mix directions within a turn — for example, spend 3 pts on one broad-reach hex and 3 pts on a second broad-reach hex — as long as the total does not exceed the budget. `moveShip` deducts the exact cost of each step; the UI computes reachable hexes via Dijkstra weighted by `moveApCost`.
+
+### Shift Model
+
+At the start of each new turn (after `game.turn` increments), `windShift(seed, turn)` returns a facet delta drawn from:
+
+| Shift | Probability |
+|---|---|
+| 0 | 40% |
+| ±1 | 25% each |
+| ±2 | 4% each |
+| ±3 | 1% each |
+
+The hash function `windRng(seed, turn)` is a fast integer hash (not cryptographic). The same seed and turn always produce the same wind, ensuring reproducibility.
+
+### Wind Display
+
+An SVG wind face (archaic cartographic style — puffed cheeks, five wind plumes) sits in the right panel. Its CSS `transform: rotate(Xdeg)` is updated by `main.js` whenever wind changes. The angle lookup `WIND_CSS_ANGLE = [330, 30, 90, 150, 210, 270]` maps `wind.dir` to the CSS rotation that points the plumes toward the leeward direction. `WIND_NAMES = ['SW', 'NW', 'N', 'NE', 'SE', 'S']` gives the standard from-direction name for each `wind.dir` index.
+
+---
+
 ## Turn Structure
 
 Each player turn proceeds as follows:
 
-1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, all units re-reveal their sight range, AP resets for all units, turn counter increments.
-2. **Auto-select** — the ship is automatically selected and move targets highlighted.
-3. **Player actions** — any order: move ship (1 AP), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP).
-4. **Auto-end detection** — after each action, the engine checks whether all options are exhausted (`ship.ap === 0` and no land crew with `ap > 0`). If so, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms.
+1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, turn counter increments, wind shifts (`windShift(seed, turn)`), ship AP is recalculated from the new wind direction, crew AP resets.
+2. **Auto-select** — the ship is automatically selected and move targets highlighted (or none if in irons).
+3. **Player actions** — any order: move ship (costs ship AP; blocked when in irons), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP).
+4. **Auto-end detection** — after each action, the engine checks whether all options are exhausted (`shipMoveTargets().length === 0` and no land crew with `ap > 0`). If so, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms.
 5. **Pass** — the player may end the turn early at any time by clicking Pass. This cancels any pending auto-end timer.
 
 **Fog timing:** `moveShip` and `moveCrew` call `setVisible` immediately, accumulating revealed hexes during the turn. The visible→explored sweep runs only in `endPlayerTurn`, so players see the full extent of their moves before the fog dims.
@@ -375,3 +418,6 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-21 | Auto-select ship at turn start | Removes one mandatory click per turn. Ship is always the first unit with options at turn start; auto-selecting it and showing targets is the natural starting state. |
 | 2026-04-21 | Fog timing: visible→explored deferred to endPlayerTurn | Players see the full extent of their moves (accumulated setVisible calls) before the fog dims. This gives informational feedback within the turn rather than immediately after each move. |
 | 2026-04-21 | Ship flag pennant replaces crew count badge | A colored pennant (human: cream, AI: teal) communicates crew presence without a number. Absence of flag = uncrewed = capturable. Numeric crew count is available in the info panel on selection. |
+| 2026-04-22 | Movement budget model replaces per-turn AP (SHIP_MOVE_BUDGET = 6) | Flat AP (1–3) let players take multiple close-reach steps in one turn, which should cost more than one running step. Budget with per-direction costs (running=2, broad=3, close=6, windward=Infinity) encodes the constraint correctly: 3 running moves, 2 broad-reach moves, or 1 close-reach move per turn. |
+| 2026-04-22 | In irons blocks only the windward hex, not all movement | Blocking all movement stranded the ship with no way to maneuver out. In irons is a heading relative to wind — the ship can turn and move in any non-windward direction. Only the single directly-upwind hex is blocked. |
+| 2026-04-22 | Ship starts facing downwind (direction = seed % 6 = windDir) | Guarantees maximum budget (3 running moves) at the start of every new game. Avoids the poor experience of loading a game and immediately being in irons or close reach. |
