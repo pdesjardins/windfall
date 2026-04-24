@@ -25,7 +25,7 @@ src/
       ai.js           ← AI player logic
       flags.js        ← flag state and capture logic
       units.js        ← crew and ship unit logic
-      forts.js        ← fortification enclosure and mechanics
+      forts.js        ← fort enclosure and mechanics
       save.js         ← serialization and deserialization
     ui/               ← DOM interaction and rendering (no game logic)
       renderer.js     ← hex grid rendering to canvas

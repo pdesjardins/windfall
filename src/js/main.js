@@ -2,7 +2,8 @@
 
 import { generateTerrain } from './engine/terrain.js';
 import { MAP_WIDTH, MAP_HEIGHT, neighbors, inBounds, hexToIndex } from './engine/hex.js';
-import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn } from './engine/game.js';
+import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn, improveTerrain, unloadCrew, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_WALL_1, IMPROVEMENT_WALL_2, IMPROVEMENT_NONE } from './engine/game.js';
+import { t } from './locale/en.js';
 import { pointOfSail, moveApCost } from './engine/wind.js';
 import * as renderer from './ui/renderer.js';
 
@@ -13,6 +14,7 @@ const btnEndTurn    = document.getElementById('btn-end-turn');
 const elTurnNum     = document.getElementById('turn-number');
 const elUnitInfo    = document.getElementById('unit-info');
 const elStatusInfo  = document.getElementById('status-info');
+const elMessageArea = document.getElementById('message-area');
 const elWindWrapper = document.getElementById('wind-face-wrapper');
 const elWindLabel   = document.getElementById('wind-label');
 
@@ -20,7 +22,8 @@ const elWindLabel   = document.getElementById('wind-label');
 // wind.dir is the leeward index, so the windward source is (dir+3)%6.
 const WIND_NAMES     = ['SW', 'NW', 'N', 'NE', 'SE', 'S'];
 // Rotate the face so its plumes point toward the leeward direction (where wind goes).
-const WIND_CSS_ANGLE = [330, 30, 90, 150, 210, 270];
+// windhead.png points DOWN (south) at 0° — 90° offset vs. the old right-pointing SVG.
+const WIND_CSS_ANGLE = [240, 300, 0, 60, 120, 180];
 const SAIL_NAMES     = ['In irons', 'Close reach', 'Broad reach', 'Running'];
 
 let game     = null;
@@ -32,6 +35,7 @@ let selection     = null;
 let pendingUnits  = [];
 let _autoEndTimer  = null;
 let _advanceTimer  = null; // brief pause before auto-advancing to next unit
+let buildMode      = false; // true while crew build menu is open
 
 // Pan state
 let dragging  = false;
@@ -62,6 +66,19 @@ window.addEventListener('mouseup', e => {
 });
 
 window.addEventListener('resize', () => renderer.render());
+
+let _messageTimer = null;
+function showMessage(text) {
+  if (!elMessageArea) return;
+  elMessageArea.textContent = text;
+  elMessageArea.classList.add('visible');
+  if (_messageTimer) clearTimeout(_messageTimer);
+  _messageTimer = setTimeout(() => {
+    _messageTimer = null;
+    elMessageArea.classList.remove('visible');
+    elMessageArea.textContent = '';
+  }, 3000);
+}
 
 let devFogOff = false;
 window.addEventListener('keydown', e => {
@@ -105,6 +122,64 @@ window.addEventListener('keydown', e => {
       pendingUnits.push(unit);
       advanceOrDeselect();
     }
+    return;
+  }
+
+  // Build mode: number keys execute an improvement, Esc/B cancels.
+  if (buildMode) {
+    if (e.key === 'Escape' || e.key === 'b' || e.key === 'B') {
+      exitBuildMode();
+      return;
+    }
+    if (selection?.type === 'crew') {
+      const crew = findCrewById(selection.id);
+      const avail = availableImprovements(crew);
+      const pick  = parseInt(e.key, 10) - 1;
+      if (pick >= 0 && pick < avail.length) {
+        improveTerrain(game, crew.id, avail[pick], terrain, MAP_WIDTH, MAP_HEIGHT);
+        exitBuildMode();
+        afterAction();
+      }
+    }
+    return;
+  }
+
+  // U: unload (wake) crew on selected ship so they can disembark to adjacent land.
+  if (e.key === 'u' || e.key === 'U') {
+    if (!selection || selection.type !== 'ship') return;
+    const ship = findShipById(selection.id);
+    if (!ship) return;
+    const hasAdjLand = neighbors(ship.q, ship.r).some(([nq, nr]) => {
+      if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) return false;
+      const ttype = terrain[hexToIndex(nq, nr, MAP_WIDTH)];
+      return ttype !== 'ocean' && ttype !== 'mountain';
+    });
+    if (!hasAdjLand) {
+      showMessage(t('msg_unload_no_land'));
+      return;
+    }
+    if (!unloadCrew(game, ship.id)) return;
+    cancelAutoEnd();
+    cancelAdvance();
+    if (!pendingUnits.some(u => u.type === 'ship' && u.id === ship.id)) {
+      pendingUnits.unshift({ type: 'ship', id: ship.id });
+    }
+    syncRenderer();
+    renderer.updateSelection(selection, selectionHighlights(selection));
+    updatePanel();
+    return;
+  }
+
+  // B: open build menu for selected crew on an improvable hex.
+  if (e.key === 'b' || e.key === 'B') {
+    if (!selection || selection.type !== 'crew') return;
+    const crew = findCrewById(selection.id);
+    if (!crew) return;
+    const avail = availableImprovements(crew);
+    if (avail.length === 0) return;
+    buildMode = true;
+    renderer.updateBuildTarget({ q: crew.q, r: crew.r });
+    updatePanel();
     return;
   }
 });
@@ -203,7 +278,7 @@ function shipMoveTargets(ship) {
 }
 
 function disembarkTargets(ship) {
-  if (!game.crew.some(c => c.aboard && c.shipId === ship.id && c.ap >= 1)) return [];
+  if (!game.crew.some(c => c.aboard && c.shipId === ship.id && c.ap >= 1 && !c.sleeping)) return [];
   return neighbors(ship.q, ship.r)
     .filter(([q, r]) => {
       if (!inBounds(q, r, MAP_WIDTH, MAP_HEIGHT)) return false;
@@ -274,6 +349,25 @@ function isUnitExhausted(sel) {
   return true;
 }
 
+function availableImprovements(crew) {
+  if (!crew || crew.aboard || crew.ap < 1) return [];
+  const idx = hexToIndex(crew.q, crew.r, MAP_WIDTH);
+  const cur = game.improvements[idx];
+  if (cur === IMPROVEMENT_WALL_1 || cur === IMPROVEMENT_WALL_2) return [IMPROVEMENT_WALL];
+  if (cur !== IMPROVEMENT_NONE) return [];
+  const t = terrain[idx];
+  if (t === 'grassland') return [IMPROVEMENT_FARM,    IMPROVEMENT_WALL];
+  if (t === 'forest')    return [IMPROVEMENT_LOGGING, IMPROVEMENT_WALL];
+  if (t === 'stone')     return [IMPROVEMENT_WALL];
+  return [];
+}
+
+function exitBuildMode() {
+  buildMode = false;
+  renderer.updateBuildTarget(null);
+  updatePanel();
+}
+
 function selectionHighlights(sel) {
   if (!sel) return [];
   if (sel.type === 'ship') {
@@ -288,12 +382,16 @@ function selectionHighlights(sel) {
 }
 
 function selectUnit(unitDesc) {
+  buildMode = false;
+  renderer.updateBuildTarget(null);
   selection = unitDesc;
   renderer.updateSelection(selection, selectionHighlights(selection));
   updatePanel();
 }
 
 function deselect() {
+  buildMode = false;
+  renderer.updateBuildTarget(null);
   selection = null;
   renderer.updateSelection(null, []);
   updatePanel();
@@ -402,6 +500,7 @@ function syncRenderer() {
   renderer.updateFog(game.fog);
   renderer.updateShips(game.ships);
   renderer.updateCrew(game.crew);
+  renderer.updateImprovements(game.improvements);
   updateWindDisplay();
 }
 
@@ -424,20 +523,42 @@ function updatePanel() {
     const aboard   = game.crew.filter(c => c.aboard && c.shipId === ship.id).length;
     const pos      = pointOfSail(game.wind.dir, ship.direction);
     const sailName = SAIL_NAMES[pos];
-    elUnitInfo.innerHTML = ship.sleeping
-      ? `<p><strong>Resolution</strong></p><p>Anchored</p>`
-      : `<p><strong>Resolution</strong></p>` +
+    if (ship.sleeping) {
+      elUnitInfo.innerHTML = `<p><strong>Resolution</strong></p><p>Anchored</p>`;
+    } else {
+      const hasAdjLand = neighbors(ship.q, ship.r).some(([nq, nr]) => {
+        if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) return false;
+        const ttype = terrain[hexToIndex(nq, nr, MAP_WIDTH)];
+        return ttype !== 'ocean' && ttype !== 'mountain';
+      });
+      const hasSleepingCrew = game.crew.some(c => c.aboard && c.shipId === ship.id && c.sleeping);
+      const unloadHint = (hasAdjLand && hasSleepingCrew) ? `<p>U — Unload crew</p>` : '';
+      elUnitInfo.innerHTML = `<p><strong>Resolution</strong></p>` +
         `<p>Crew: ${aboard} / ${game.crew.length}</p>` +
         `<p>Wind: ${WIND_NAMES[game.wind.dir]}</p>` +
-        `<p>${sailName} — ${Math.floor(ship.ap / 2)} AP</p>`;
+        `<p>${sailName} — ${Math.floor(ship.ap / 2)} AP</p>` +
+        unloadHint;
+    }
     return;
   }
   if (selection.type === 'crew') {
     const c = findCrewById(selection.id);
     if (c) {
-      elUnitInfo.innerHTML = c.sleeping
-        ? `<p><strong>Crew ${c.id + 1}</strong></p><p>Encamped</p>`
-        : `<p><strong>Crew ${c.id + 1}</strong></p><p>AP: ${c.ap} / 1</p>`;
+      if (buildMode) {
+        const avail  = availableImprovements(c);
+        const cur    = game.improvements[hexToIndex(c.q, c.r, MAP_WIDTH)];
+        const wallLabel = cur === IMPROVEMENT_WALL_1 ? 'Wall (2/3)' :
+                          cur === IMPROVEMENT_WALL_2 ? 'Wall (3/3)' : 'Wall (1/3)';
+        const labels = { [IMPROVEMENT_FARM]: 'Farm', [IMPROVEMENT_LOGGING]: 'Logging Camp', [IMPROVEMENT_WALL]: wallLabel };
+        const opts   = avail.map((imp, i) => `<p>${i + 1} — ${labels[imp]}</p>`).join('');
+        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>Build:</p>${opts}<p>Esc — Cancel</p>`;
+      } else if (c.sleeping) {
+        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>Encamped</p>`;
+      } else {
+        const avail     = availableImprovements(c);
+        const buildHint = avail.length > 0 ? `<p>B — Build</p>` : '';
+        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>AP: ${c.ap} / 1</p>${buildHint}`;
+      }
     }
   }
 }
@@ -477,7 +598,7 @@ function handleClick(px, py) {
     }
 
     // Try to disembark crew to adjacent land hex.
-    const aboardCrew = game.crew.find(c => c.aboard && c.shipId === ship.id && c.ap >= 1);
+    const aboardCrew = game.crew.find(c => c.aboard && c.shipId === ship.id && c.ap >= 1 && !c.sleeping);
     if (aboardCrew) {
       if (disembarkCrew(game, aboardCrew.id, q, r, terrain, MAP_WIDTH, MAP_HEIGHT)) {
         afterAction();

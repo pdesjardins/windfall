@@ -136,7 +136,7 @@ A ship with no reachable move targets is rendered at 35% opacity. A sleeping shi
 
 Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
 
-`game.nextShipId` is a monotonically increasing integer used to assign stable IDs when new ships are created (e.g. via fortification production).
+`game.nextShipId` is a monotonically increasing integer used to assign stable IDs when new ships are created (e.g. via fort production).
 
 ### Crew
 
@@ -153,7 +153,9 @@ Each crew unit carries:
 
 Crew with `ap === 0` are rendered at 35% opacity. Sleeping crew are rendered at 50% opacity.
 
-**Aboard crew** contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). The mechanical disembark action does not consume ship AP.
+**Aboard crew** start each turn `sleeping: true` (auto-anchored). They cannot disembark until the player issues a **U — Unload** command on the ship, which calls `unloadCrew` to wake all sleeping crew aboard. At turn end, `endPlayerTurn` re-sleeps all aboard crew. This ensures the player explicitly chooses when to put crew ashore rather than having them automatically eligible every turn.
+
+Aboard crew contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). The mechanical disembark action does not consume ship AP.
 
 **Land crew** move independently on land hexes (not ocean, not mountain). Each move costs 1 AP. Moving onto the ship's hex embarks the crew (1 AP).
 
@@ -197,7 +199,7 @@ The hash function `windRng(seed, turn)` is a fast integer hash (not cryptographi
 
 ### Wind Display
 
-An SVG wind face (archaic cartographic style — puffed cheeks, five wind plumes) sits in the right panel. Its CSS `transform: rotate(Xdeg)` is updated by `main.js` whenever wind changes. The angle lookup `WIND_CSS_ANGLE = [330, 30, 90, 150, 210, 270]` maps `wind.dir` to the CSS rotation that points the plumes toward the leeward direction. `WIND_NAMES = ['SW', 'NW', 'N', 'NE', 'SE', 'S']` gives the standard from-direction name for each `wind.dir` index.
+A PNG wind face (`src/assets/windhead.png` — antique cartographic style, black lines on transparent background) sits in the right panel. A CSS filter (`invert(1) sepia(0.45) brightness(0.9)`) warms the black lines to match the parchment palette. Its `transform: rotate(Xdeg)` is updated by `main.js` whenever wind changes. The angle lookup `WIND_CSS_ANGLE = [240, 300, 0, 60, 120, 180]` maps `wind.dir` to the CSS rotation that points the plumes toward the leeward direction (calibrated for windhead.png's natural orientation: plumes point south at 0°). `WIND_NAMES = ['SW', 'NW', 'N', 'NE', 'SE', 'S']` gives the standard from-direction name for each `wind.dir` index.
 
 ---
 
@@ -221,26 +223,26 @@ Each player turn proceeds as follows:
 
 ---
 
-## Fortification System
+## Fort System
 
-Fortifications are built wall segment by wall segment and go live when the wall forms a closed loop.
+Forts are built wall segment by wall segment and go live when the wall forms a closed loop.
 
 **Improvements and mutual exclusivity:** A wall is a hex improvement. Each hex holds exactly one improvement. Grassland accepts a farm or wall. Forest accepts a logging camp or wall. Stone accepts a wall only. Mountains are natural wall segments requiring no improvement.
 
-**Wall construction:** A crew unit spends 5 turns on a grassland, forest, or stone hex to convert it to a wall improvement.
+**Wall construction:** A crew unit spends 3 turns on a grassland, forest, or stone hex to convert it to a wall improvement. Each turn advances the hex through intermediate states `IMPROVEMENT_WALL_1` → `IMPROVEMENT_WALL_2` → `IMPROVEMENT_WALL`. The renderer draws each stage distinctly (foundation only; foundation + 2 outer merlons; complete 3-merlon wall) at increasing opacity so construction progress is visible on the map.
 
-**Live detection:** After each wall placement, the game checks whether the new wall hex completes a closed loop — a contiguous chain of wall hexes and/or mountain hexes connected back to itself. When a closed loop is detected, the hexes enclosed by the loop become the live fortification interior.
+**Live detection:** After each wall placement, the game checks whether the new wall hex completes a closed loop — a contiguous chain of wall hexes and/or mountain hexes connected back to itself. When a closed loop is detected, the hexes enclosed by the loop become the live fort interior.
 
 **Embarkation:** Crew may embark and disembark across the boundary between a coast hex and an adjacent friendly wall hex (gates assumed). Enemy wall hexes block disembarkation and trigger cannon fire.
 
-**Live fortification capabilities:**
+**Live fort capabilities:**
 - Fires cannons at enemy units within range (automatic, end of player turn)
 - Generates crew units if a farm is within 3 hexes
-- Generates ship units if a logging camp is within 3 hexes and the fortification contains a shore-adjacent wall hex; the ship appears on an adjacent coast hex
+- Generates ship units if a logging camp is within 3 hexes and the fort contains a shore-adjacent wall hex; the ship appears on an adjacent coast hex
 - Can receive and protect the enemy flag (win condition)
 - Can store the player's own flag (hidden flag location)
 
-**Stone wall bonus:** Wall segments on stone hexes increase the fortification's defensive rating. The bonus is intrinsic to the stone material, not to proximity.
+**Stone wall bonus:** Wall segments on stone hexes increase the fort's defensive rating. The bonus is intrinsic to the stone material, not to proximity.
 
 ---
 
@@ -277,8 +279,8 @@ The AI player is a functional mirror of the human player: one ship, standard cre
 **AI behavior (initial implementation):**
 1. In early turns, the AI moves its flag-carrying crew unit to a land hex and hides the flag.
 2. The AI allocates ships and crew on a fixed turn schedule.
-3. The AI seeks out player-visible ships and fortifications and moves toward them.
-4. AI ships fire cannons at player ships and fortifications within range.
+3. The AI seeks out player-visible ships and forts and moves toward them.
+4. AI ships fire cannons at player ships and forts within range.
 5. AI crew seeks the player's flag once the AI has explored the hex containing it.
 
 AI sophistication is intentionally limited in the initial implementation. The AI does not require sophisticated pathfinding beyond shortest-path to a known target.
@@ -337,6 +339,7 @@ The game is primarily mouse-driven. The canvas element handles clicks and drag-t
 | `Space` | Skip selected unit for this turn |
 | `W` | Wait — defer selected unit to end of queue |
 | `F` | Encamp / Anchor — sleep selected unit until explicitly woken |
+| `U` | Unload — wake all sleeping crew aboard the selected ship (only actionable when ship is adjacent to land) |
 | `Ctrl+Shift+F` | Toggle fog of war off/on (dev mode) |
 
 The full reference is in `docs/user/reference/keybindings.md`.
@@ -390,7 +393,7 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-19 | Wind drives ship AP via points of sail (1–3) | Authentic nautical mechanic encoded in engine; wind direction is global map state |
 | 2026-04-19 | Attack is implicit movement; no explicit attack command | Moving onto enemy hex triggers combat; simplifies input model |
 | 2026-04-19 | Cannon range constant at 1 hex | No range tracking needed; walls auto-fire; ships spend 1 AP |
-| 2026-04-19 | Two-tier fortification model | Tier 1 (any wall) fires cannons; Tier 2 (enclosed) unlocks production and flag win |
+| 2026-04-19 | Two-tier fort model | Tier 1 (any wall) fires cannons; Tier 2 (enclosed) unlocks production and flag win |
 | 2026-04-18 | SVG for terrain hexes, PNG for sprites | SVG scales to any hex size without quality loss; easy to swap for skinning; PNG is the natural format for detailed unit sprites and what designers expect |
 | 2026-04-18 | Localization via externalized string modules | No raw strings in UI code; RTL support via CSS logical properties; English only currently but architecture is translation-ready |
 | 2026-04-18 | QWEASDZXC default hex navigation keys | 3×3 key block mirrors hex geometry; 6 direction keys + wait; W and X unassigned; bindings are user-customizable via localStorage |
@@ -398,7 +401,7 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-19 | Coast terrain type removed entirely | Embarkation is adjacency-based (any ocean hex next to land); separate coast type added complexity with no gameplay benefit; removed during Sprint 1B |
 | 2026-04-19 | Ridged multifractal noise for elevation | Produces sharp mountain ridges, island silhouettes, and inland lake basins; standard fractal noise produced only rolling hills |
 | 2026-04-19 | Stone classified by biome noise, not elevation | Prevents stone from forming a ring around mountains; scatters it freely across all land as patches |
-| 2026-04-19 | Volcanic scatter pass for isolated mountains | Adds tactically interesting mountain formations near coastlines independent of elevation; creates natural fortification opportunities |
+| 2026-04-19 | Volcanic scatter pass for isolated mountains | Adds tactically interesting mountain formations near coastlines independent of elevation; creates natural fort opportunities |
 | 2026-04-20 | Even-q offset coordinates (not pure axial) | Renderer uses even-q offset pixel formula to produce a rectangular map; pure axial pixel formula produces a parallelogram. All engine math converts offset↔axial internally via `toAxial`/`fromAxial` helpers in `hex.js`. Callers always use offset coords. |
 | 2026-04-20 | DIRECTION_ANGLES computed from actual offset neighbors | Raw axial deltas applied to `hexToPixel` give wrong pixel positions for directions 3 and 4, causing the ship marker to point the wrong way. Angles must be computed from the pixel position of the true offset neighbor. |
 | 2026-04-20 | Edge starfield revealed by circle clip at ship position | The starfield clip path is extended with a circle around each visible ship, so the space scene bleeds beyond the map boundary when the ship approaches the edge. Within the map, terrain draws on top and hides the circle; it only has visual effect in the void outside the map. |
@@ -411,8 +414,12 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-22 | Movement budget model replaces per-turn AP (SHIP_MOVE_BUDGET = 6) | Flat AP (1–3) let players take multiple close-reach steps in one turn, which should cost more than one running step. Budget with per-direction costs (running=2, broad=3, close=6, windward=Infinity) encodes the constraint correctly: 3 running moves, 2 broad-reach moves, or 1 close-reach move per turn. |
 | 2026-04-22 | In irons blocks only the windward hex, not all movement | Blocking all movement stranded the ship with no way to maneuver out. In irons is a heading relative to wind — the ship can turn and move in any non-windward direction. Only the single directly-upwind hex is blocked. |
 | 2026-04-22 | Ship starts facing downwind (direction = seed % 6 = windDir) | Guarantees maximum budget (3 running moves) at the start of every new game. Avoids the poor experience of loading a game and immediately being in irons or close reach. |
-| 2026-04-23 | Ships stored as array with stable `id` fields; crew tracks `shipId` | Anticipates multiple ships from fortification production. All engine functions take `shipId` as a parameter. Crew tracks which ship they are aboard by `shipId` so the relationship survives array reordering. |
+| 2026-04-23 | Ships stored as array with stable `id` fields; crew tracks `shipId` | Anticipates multiple ships from fort production. All engine functions take `shipId` as a parameter. Crew tracks which ship they are aboard by `shipId` so the relationship survives array reordering. |
 | 2026-04-23 | CREW_AP reduced from 2 to 1 | Two AP per crew gave an extra free move with no meaningful decision. One action per crew per turn creates a cleaner constraint and matches the "simple rules" design goal. |
 | 2026-04-23 | Unit selection queue (`pendingUnits`) with Space/W/F controls | Civ-style queue eliminates mandatory clicks on spent units. Space skips a unit for the turn. W defers it to end of queue. F puts it to sleep across turns (encamp/anchor). The queue auto-advances with a 250 ms pause and 350 ms animated camera pan so players can see where each unit moved before the camera jumps. |
 | 2026-04-23 | Sleeping units (`sleeping` flag) persist across turns until explicitly woken | Crew left on a scouted island and ships in harbor should not require a turn-pass every turn. Sleeping removes a unit from the queue permanently. Clicking the unit wakes it and re-inserts it into the queue. Visual: 50% opacity (distinct from 35% for spent-active). |
 | 2026-04-23 | `wakeUnit` always re-queues eligible units regardless of current sleeping state | Originally bailed out early if `!unit.sleeping`. This silently failed to re-queue units that were awake but had fallen out of `pendingUnits`. Always clearing sleeping and re-inserting when eligible is the safe behavior. |
+| 2026-04-24 | Aboard crew start sleeping each turn; U key required to unload | Removes ambiguity at turn start: crew on the ship are resting. Unloading is an explicit order, not an automatic capability. Avoids the confusing "ship has no moves, press Pass" state when crew are technically eligible to disembark but the player hasn't decided to send them ashore. |
+| 2026-04-24 | Wall construction takes 3 turns (not 5) | 5 turns was the original spec; 3 turns was preferred after considering the 1-AP-per-turn crew rhythm. 3 turns creates meaningful investment without being punishing in a game where crew often have limited turns ashore. |
+| 2026-04-24 | Wall construction state lives on the hex (WALL_1/WALL_2 improvement values), not on the crew | A partially-built wall belongs to the location, not the builder. Any crew member can continue work across separate turns. Whether progress is lost when the crew leaves is still an open mechanic (see backlog). |
+| 2026-04-24 | PNG wind face (`windhead.png`) replaces hand-coded SVG | SVG approach produced an unrecognizable face. Player-provided PNG is high quality and the correct aesthetic. CSS filter handles palette matching without editing the asset. |

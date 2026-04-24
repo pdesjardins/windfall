@@ -37,7 +37,7 @@ Explains what something is and how it works. Answers the question "what is this?
 - [Link to related concept, reference, or guide]
 ```
 
-**Examples:** What is fog of war? What is a fortification? How does flag capture work?
+**Examples:** What is fog of war? What is a fort? How does flag capture work?
 
 ### Reference
 
@@ -83,7 +83,7 @@ Describes how to accomplish a specific task. Answers the question "how do I do X
 [What the reader should see or have accomplished.]
 ```
 
-**Examples:** How to start a new game, how to build a fortification, how to save and resume a game.
+**Examples:** How to start a new game, how to build a fort, how to save and resume a game.
 
 ---
 
@@ -148,7 +148,8 @@ Use terms consistently. The canonical term list is maintained in `docs/user/refe
 - **hex** (not "tile," "cell," or "space") — one unit of the game map
 - **crew** (not "soldiers," "units," or "people") — the player's land-based units
 - **ship** — the player's naval unit
-- **fortification** — the enclosed defensive structure built by crew
+- **wall** — a hex improvement built by crew; the building block of a fort
+- **fort** — the enclosed defensive structure that emerges when walls form a closed loop
 - **flag** — the object that must be captured to win
 
 ### Formatting

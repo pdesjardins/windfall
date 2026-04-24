@@ -11,7 +11,7 @@ You can save at any time during your turn — before you end the turn and pass t
 2. Your browser downloads a file named `windfall-save.json` to your device.
 3. Store this file somewhere you can find it. Your desktop or a dedicated folder works well.
 
-The save file captures the complete state of your game: the map, all unit positions, fog of war state, flag locations, fortifications, and turn number.
+The save file captures the complete state of your game: the map, all unit positions, fog of war state, flag locations, forts, and turn number.
 
 ## Resuming a Game
 

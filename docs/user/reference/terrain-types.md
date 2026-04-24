@@ -27,25 +27,25 @@ Open water. Ships move freely. Crew cannot enter ocean hexes directly — they m
 
 ### Grassland
 
-Open grassy terrain. The most common land type. Crew move through grassland at normal movement cost. A grassland hex can be improved into a farm (enabling crew production at nearby fortifications) or a wall segment (contributing to a fortification).
+Open grassy terrain. The most common land type. Crew move through grassland at normal movement cost. A grassland hex can be improved into a farm (enabling crew production at nearby forts) or a wall segment (contributing to a fort).
 
 *Rendered as green with small wheat stalks.*
 
 ### Forest
 
-Forested land. A forest hex can be improved into a logging camp (enabling ship production at nearby fortifications) or a wall segment. Choosing one precludes the other.
+Forested land. A forest hex can be improved into a logging camp (enabling ship production at nearby forts) or a wall segment. Choosing one precludes the other.
 
 *Rendered as dark green with a small conifer triangle.*
 
 ### Stone
 
-Rocky terrain that crew can enter. Stone hexes can only be improved into wall segments — they cannot become farms or logging camps. Wall segments built on stone hexes grant the enclosing fortification a defensive bonus, reducing incoming cannon damage. This bonus comes from the stone material itself.
+Rocky terrain that crew can enter. Stone hexes can only be improved into wall segments — they cannot become farms or logging camps. Wall segments built on stone hexes grant the enclosing fort a defensive bonus, reducing incoming cannon damage. This bonus comes from the stone material itself.
 
 *Rendered as grey-brown with staggered masonry bricks.*
 
 ### Mountain
 
-High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as natural wall segments — a chain of fortification walls can connect through mountains without requiring crew to build there.
+High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as natural wall segments — a chain of fort walls can connect through mountains without requiring crew to build there.
 
 *Rendered as dark brown with a two-peak silhouette.*
 
@@ -53,15 +53,15 @@ High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as 
 
 | Base Terrain | Improvement | Effect |
 |---|---|---|
-| Grassland | Farm | Enables crew production at fortifications within 3 hexes |
-| Grassland | Wall | Contributes to a fortification; standard defensive rating |
-| Forest | Logging Camp | Enables ship production at fortifications within 3 hexes |
-| Forest | Wall | Contributes to a fortification; standard defensive rating |
-| Stone | Wall | Contributes to a fortification; enhanced defensive rating |
+| Grassland | Farm | Enables crew production at forts within 3 hexes |
+| Grassland | Wall | Contributes to a fort; standard defensive rating |
+| Forest | Logging Camp | Enables ship production at forts within 3 hexes |
+| Forest | Wall | Contributes to a fort; standard defensive rating |
+| Stone | Wall | Contributes to a fort; enhanced defensive rating |
 
 ## Related Topics
 
-- [Fortifications](../concepts/fortifications.md)
+- [Forts](../concepts/forts.md)
 - [Crew and Ships](../concepts/units.md)
 - [Fog of War](../concepts/fog-of-war.md)
 - [Glossary](glossary.md)

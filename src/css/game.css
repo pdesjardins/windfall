@@ -122,19 +122,44 @@
   border-color: #5a8a6a;
 }
 
+/* ── Message area ── */
+
+#message-area {
+  display: none;
+  padding: 0.4rem 0.6rem;
+  background-color: rgba(180, 120, 20, 0.18);
+  border: 1px solid rgba(220, 160, 30, 0.45);
+  border-radius: 3px;
+  font-size: 0.8rem;
+  color: #e8c870;
+  line-height: 1.3;
+}
+
+#message-area.visible {
+  display: block;
+}
+
 /* ── Wind display ── */
 
 #wind-display {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
+  padding-block-end: 0.75rem;
+  border-block-end: 1px solid #2a3a44;
 }
 
 #wind-face-wrapper {
   transition: transform 0.6s ease;
   transform-origin: 50% 50%;
   opacity: 0.85;
+}
+
+#wind-face-img {
+  display: block;
+  /* Invert black→white, then warm it to match the parchment palette */
+  filter: invert(1) sepia(0.45) brightness(0.9);
 }
 
 #wind-label {

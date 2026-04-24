@@ -5,11 +5,11 @@ Combat in Windfall requires no special command. Attacking is an act of movement 
 
 ## Cannon Fire
 
-Ships and fortification wall segments fire cannons at adjacent enemies. Cannon range is always exactly one hex.
+Ships and wall segments fire cannons at adjacent enemies. Cannon range is always exactly one hex.
 
 **Ships** fire cannons by spending one action point to move toward an enemy unit on an adjacent hex. The ship does not move onto that hex — it stays in place and fires. Ships can fire across the land and sea boundary, striking crew or wall segments on an adjacent land hex from the water.
 
-**Wall segments** fire automatically at the end of your turn at any enemy unit on an adjacent hex. No action is required and no action points are spent. A single wall segment, even one not yet part of an enclosed fortification, will fire in any direction.
+**Wall segments** fire automatically at the end of your turn at any enemy unit on an adjacent hex. No action is required and no action points are spent. A single wall segment, even one not yet part of an enclosed fort, will fire in any direction.
 
 ## Crew Melee
 
@@ -26,7 +26,7 @@ Different units absorb different amounts of damage before being destroyed:
 
 **Ships** absorb multiple hits before being destroyed. A ship that has taken damage shows no reduction in capability — it performs identically until the moment it is lost.
 
-**Wall segments** also absorb multiple hits. Stone wall segments are more durable than those built on grassland or forest. When a wall segment is destroyed, a gap opens in the wall. If the gap breaks an enclosed fortification, the fortification loses its production and flag-winning capabilities until the gap is repaired.
+**Wall segments** also absorb multiple hits. Stone wall segments are more durable than those built on grassland or forest. When a wall segment is destroyed, a gap opens in the wall. If the gap breaks an enclosed fort, the fort loses its production and flag-winning capabilities until the gap is repaired.
 
 ## Enemies Never Share a Hex
 
@@ -34,6 +34,6 @@ Friendly units may stack on the same hex freely. Enemy units may never occupy th
 
 ## Related Topics
 
-- [Fortifications](fortifications.md)
+- [Forts](fortifications.md)
 - [Crew and Ships](units.md)
 - [Wind](wind.md)
