@@ -26,6 +26,6 @@ A full game of Windfall unfolds over many turns and may span multiple sessions. 
 - [The Story So Far](../intro.md)
 - [Fog of War](fog-of-war.md)
 - [Wind](wind.md)
-- [Forts](forts.md)
+- [Forts](fortifications.md)
 - [Combat](combat.md)
 - [The Concordance](flag.md)

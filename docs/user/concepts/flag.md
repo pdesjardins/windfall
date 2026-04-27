@@ -39,6 +39,6 @@ Your goal is to move the carrier to the same hex where your own half is hidden. 
 
 - [What Is Windfall?](what-is-windfall.md)
 - [The Story So Far](../intro.md)
-- [Forts](forts.md)
+- [Forts](fortifications.md)
 - [Fog of War](fog-of-war.md)
 - [How to Capture the Flag](../guides/capture-the-flag.md)

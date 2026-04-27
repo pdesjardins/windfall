@@ -51,5 +51,5 @@ While you are pursuing the enemy's half, your opponent is pursuing yours. Keep i
 ## Related Topics
 
 - [The Concordance](../concepts/flag.md)
-- [Forts](../concepts/forts.md)
+- [Forts](../concepts/fortifications.md)
 - [Crew and Ships](../concepts/units.md)

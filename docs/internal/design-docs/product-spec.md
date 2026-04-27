@@ -187,7 +187,7 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 6. The crew unit may then move to an adjacent hex and repeat.
 7. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fort**.
 
-Mountain hexes participate as natural wall segments without requiring any improvement. The closed-loop detection replaces the prior flood-fill model.
+Mountain hexes participate as natural wall segments without requiring any improvement. Detection uses an outside-in flood fill: starting from all ocean hexes and map-boundary open hexes, the engine fills inward through non-wall non-mountain terrain. Any land hex that cannot be reached is enclosed. If the enclosing boundary includes at least one complete player wall, all walls connected to that boundary — including dead-end spurs — are marked live in `game.liveWalls`. Detection runs at the end of each turn. Interior hexes are not separately tracked in the current implementation.
 
 ### Embarkation at Fortified Shore
 
@@ -391,3 +391,6 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-22 | Ship starts facing downwind | Guarantees 3 running moves at game start. Prevents the poor UX of loading a new game and being immediately in irons. |
 | 2026-04-26 | Wall construction is a committed 3-turn action; no partial completion | Allowing crews to build one stage and walk away makes wall placement feel like a cheap incremental action and breaks the "this hex is or isn't a wall" invariant. The locked-builder model makes construction a meaningful commitment and keeps wall state binary from the game's perspective. |
 | 2026-04-26 | Wall construction time standardized to 3 turns (was 5 in spec, 3 in user docs) | User doc was correct; spec contained an earlier draft value. 3 turns matches the WALL_1/WALL_2/WALL stage count and feels right for early playtesting. |
+| 2026-04-27 | Fort detection runs at end of turn, not after each wall placement | Wall completion already only happens at turn end via endPlayerTurn. Running detection there keeps all end-of-turn state transitions in one place and avoids partial-state detection mid-turn. |
+| 2026-04-27 | Live fort indicated by perimeter lines between adjacent live wall centers; no interior fill | Perimeter lines give clear feedback without needing interior hex tracking. Interior marking deferred until fort capabilities such as cannon fire and production require distinguishing interior hexes. |
+| 2026-04-27 | Mixed-player perimeter ownership check deferred | AI building not yet implemented; all walls are currently human-owned. Ownership tracking per hex will be added when AI building is introduced. |

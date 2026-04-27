@@ -24,9 +24,9 @@ Give crew the ability to improve terrain and build fort walls. Introduces the "a
 - [x] Partial walls render at reduced opacity with visible stage (foundation only; foundation + 2 merlons; full wall)
 
 ### Closed-loop detection
-- [ ] After each wall placement, the engine checks whether a closed loop of walls + mountains has formed
-- [ ] When a loop closes, the enclosed interior hexes are marked as a live fort
-- [ ] Live fort interior renders distinctly from plain land
+- [x] After each turn end, the engine checks whether a closed loop of walls + mountains has formed (implemented in Sprint 6A; runs at turn end rather than after each placement)
+- [x] When a loop closes, all connected wall segments are marked live in `game.liveWalls`
+- [ ] Live fort interior renders distinctly from plain land (deferred — perimeter lines are sufficient for now)
 
 ### General
 - [ ] All improvements and wall state survive turn-end correctly

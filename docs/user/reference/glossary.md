@@ -73,7 +73,7 @@ A land hex that has at least one coast hex as a neighbor. Shore-adjacent wall he
 A wall segment built on a stone hex. Stone walls provide an enhanced defensive rating for the enclosing fort. See [Terrain Types](terrain-types.md).
 
 **wall segment**
-An improvement built by a crew unit on a grassland, forest, or stone hex over 5 turns. Wall segments, combined with mountain hexes, form closed loops that create live forts. One improvement per hex — a wall precludes other improvements on that hex. See [Forts](../concepts/fortifications.md).
+An improvement built by a crew unit on a grassland, forest, or stone hex over 3 turns. Wall segments, combined with mountain hexes, form closed loops that create live forts. One improvement per hex — a wall precludes other improvements on that hex. See [Forts](../concepts/fortifications.md).
 
 **wind**
 A global direction affecting ship movement each turn. Wind is named by where it comes from. The direction shifts gradually over the course of the game. See [Wind](../concepts/wind.md).

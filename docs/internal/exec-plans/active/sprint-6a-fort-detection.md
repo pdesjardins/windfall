@@ -8,26 +8,26 @@ Detect live forts at end of turn and render a visual perimeter line connecting a
 ## Acceptance Criteria
 
 ### Detection
-- [ ] At end of turn, the engine runs fort detection and updates `game.liveWalls`
-- [ ] A closed ring of friendly walls + mountains enclosing at least one land hex marks all boundary walls as live
-- [ ] Wall segments connected to a live boundary wall (spurs) are also marked live
-- [ ] A pure mountain enclosure with no player walls does not produce a live fort
-- [ ] A perimeter containing walls from both players produces no live fort for either player
-- [ ] Fort detection runs in `endPlayerTurn` — no per-move detection
+- [x] At end of turn, the engine runs fort detection and updates `game.liveWalls`
+- [x] A closed ring of friendly walls + mountains enclosing at least one land hex marks all boundary walls as live
+- [x] Wall segments connected to a live boundary wall (spurs) are also marked live
+- [x] A pure mountain enclosure with no player walls does not produce a live fort
+- [ ] A perimeter containing walls from both players produces no live fort for either player (deferred — AI building not yet implemented; ownership not tracked per hex)
+- [x] Fort detection runs in `endPlayerTurn` — no per-move detection
 
 ### Rendering
-- [ ] A line segment is drawn between the pixel centers of each pair of adjacent live wall hexes
-- [ ] No line is drawn between non-live wall hexes or between a live and non-live wall
-- [ ] Lines are drawn above the terrain layer but below unit sprites
+- [x] A line segment is drawn between the pixel centers of each pair of adjacent live wall hexes
+- [x] No line is drawn between non-live wall hexes or between a live and non-live wall
+- [x] Lines are drawn above the terrain layer but below unit sprites
 
 ### Tests
-- [ ] Minimal enclosed ring (walls + mountains) → all boundary walls live
-- [ ] Spur attached to live ring → spur wall also live
-- [ ] Mountain-only enclosure → no live walls
-- [ ] Enemy wall in perimeter → no live walls for either player
-- [ ] Two separate forts on same map → each detected independently
-- [ ] Isolated wall with no enclosure → not live
-- [ ] All existing tests continue to pass
+- [x] Minimal enclosed ring → all boundary walls live
+- [x] Spur attached to live ring → spur wall also live
+- [x] Mountain-only enclosure → no live walls
+- [ ] Enemy wall in perimeter → no live walls for either player (deferred with ownership check above)
+- [ ] Two separate forts on same map → each detected independently (not yet tested)
+- [x] Isolated wall with no enclosure → not live
+- [x] All existing tests continue to pass (164 total)
 
 ## Out of Scope
 
@@ -81,6 +81,7 @@ liveWalls: new Uint8Array(width * height)  // 0 = not live, 1 = live
 | Date | Update |
 |---|---|
 | 2026-04-27 | Plan created. Depends on Sprint 5B wall construction completing first. |
+| 2026-04-27 | Implemented. `detectForts` added to game.js; called from `endPlayerTurn`. `liveWalls` Uint8Array added to game state. Renderer draws perimeter lines between adjacent live wall hex centers. 6 new unit tests; 164 total passing. Mixed-perimeter ownership check deferred until AI building is implemented. |
 
 ## Decision Log
 

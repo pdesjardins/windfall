@@ -98,7 +98,7 @@ The 3-turn count is: the turn the crew initiates building + 2 subsequent turns s
 
 ---
 
-### 9. Fort detection not implemented — walls never go live
+### 9. ~~Fort detection not implemented — walls never go live~~ (fixed Sprint 6A)
 
 The engine has no closed-loop detection. After each wall placement, `improveTerrain` sets `IMPROVEMENT_WALL` but never checks whether the new segment completes a ring. No interior hexes are ever marked as a live fort. The renderer has no fort interior state to draw. From the player's perspective, walls are inert tiles with no feedback that an enclosure is complete.
 
