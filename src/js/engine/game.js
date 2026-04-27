@@ -38,6 +38,7 @@ export function initGame(seed, terrain, width, height) {
 
   const crew = Array.from({ length: CREW_COUNT }, (_, id) => ({
     id, aboard: true, shipId: 0, q: null, r: null, ap: CREW_AP, sleeping: true,
+    building: false, buildTurnsRemaining: 0,
   }));
 
   setVisible(fog, q, r, SHIP_SIGHT_RANGE, width, height);
@@ -48,11 +49,12 @@ export function initGame(seed, terrain, width, height) {
 }
 
 // Improve the hex a crew member is standing on. Costs 1 crew AP.
-// Farm/logging complete in one turn. Wall takes three turns (NONE→WALL_1→WALL_2→WALL).
+// Farm and logging complete in one turn. Wall construction uses startWallConstruction instead.
 export function improveTerrain(game, crewId, improvementType, terrain, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
   if (crew.sleeping) return null;
+  if (crew.building) return null;
   if (crew.ap < 1) return null;
 
   const idx = hexToIndex(crew.q, crew.r, width);
@@ -67,21 +69,31 @@ export function improveTerrain(game, crewId, improvementType, terrain, width, he
     if (cur !== IMPROVEMENT_NONE) return null;
     if (t !== 'forest')           return null;
     game.improvements[idx] = IMPROVEMENT_LOGGING;
-  } else if (improvementType === IMPROVEMENT_WALL) {
-    if (cur === IMPROVEMENT_NONE) {
-      if (t !== 'grassland' && t !== 'forest' && t !== 'stone') return null;
-      game.improvements[idx] = IMPROVEMENT_WALL_1;
-    } else if (cur === IMPROVEMENT_WALL_1) {
-      game.improvements[idx] = IMPROVEMENT_WALL_2;
-    } else if (cur === IMPROVEMENT_WALL_2) {
-      game.improvements[idx] = IMPROVEMENT_WALL;
-    } else {
-      return null;
-    }
   } else {
     return null;
   }
 
+  crew.ap -= 1;
+  return game;
+}
+
+// Begin wall construction on the crew's current hex. The crew commits for 2 subsequent turns;
+// endPlayerTurn advances the build automatically and completes it without further input.
+export function startWallConstruction(game, crewId, terrain, width, height) {
+  const crew = game.crew.find(c => c.id === crewId);
+  if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.building) return null;
+  if (crew.ap < 1) return null;
+
+  const idx = hexToIndex(crew.q, crew.r, width);
+  if (game.improvements[idx] !== IMPROVEMENT_NONE) return null;
+  const t = terrain[idx];
+  if (t !== 'grassland' && t !== 'forest' && t !== 'stone') return null;
+
+  game.improvements[idx]   = IMPROVEMENT_WALL_1;
+  crew.building            = true;
+  crew.buildTurnsRemaining = 2;
   crew.ap -= 1;
   return game;
 }
@@ -144,6 +156,7 @@ export function embarkCrew(game, crewId, shipId, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
   if (crew.sleeping) return null;
+  if (crew.building) return null;
   if (crew.ap < 1) return null;
 
   const ship = game.ships.find(s => s.id === shipId);
@@ -166,6 +179,7 @@ export function moveCrew(game, crewId, targetQ, targetR, terrain, width, height)
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
   if (crew.sleeping) return null;
+  if (crew.building) return null;
   if (crew.ap < 1) return null;
   if (!inBounds(targetQ, targetR, width, height)) return null;
 
@@ -200,8 +214,21 @@ export function endPlayerTurn(game, width, height) {
   game.wind.dir  = applyShift(game.wind.dir, windShift(game.seed, game.turn));
   for (const ship of game.ships) ship.ap = SHIP_MOVE_BUDGET;
   for (const c of game.crew) {
-    c.ap = CREW_AP;
-    if (c.aboard) c.sleeping = true;
+    if (c.building) {
+      c.buildTurnsRemaining--;
+      if (c.buildTurnsRemaining === 0) {
+        game.improvements[hexToIndex(c.q, c.r, width)] = IMPROVEMENT_WALL;
+        c.building = false;
+        c.ap = CREW_AP;
+      } else {
+        const idx = hexToIndex(c.q, c.r, width);
+        if (game.improvements[idx] === IMPROVEMENT_WALL_1) game.improvements[idx] = IMPROVEMENT_WALL_2;
+        c.ap = 0;
+      }
+    } else {
+      c.ap = CREW_AP;
+      if (c.aboard) c.sleeping = true;
+    }
   }
   return game;
 }

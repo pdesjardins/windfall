@@ -29,6 +29,7 @@ const strings = {
   crew_status_encamped:     'Encamped',
   crew_ap:                  'AP: {ap} / 1',
   crew_hint_build:          'B — Build',
+  crew_building_wall:       'Building wall ({stage} of 3)',
   crew_build_label:         'Build:',
   crew_build_cancel:        'Esc — Cancel',
 

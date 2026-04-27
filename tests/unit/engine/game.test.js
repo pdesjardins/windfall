@@ -2,7 +2,7 @@
 
 import {
   initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn,
-  improveTerrain, unloadCrew,
+  improveTerrain, startWallConstruction, unloadCrew,
   IMPROVEMENT_NONE, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_WALL_1, IMPROVEMENT_WALL_2,
   CREW_AP, CREW_COUNT, SHIP_SIGHT_RANGE,
 } from '../../../src/js/engine/game.js';
@@ -343,7 +343,7 @@ export function runTests(assert) {
       fGame.improvements[hexToIndex(forestHex.q, forestHex.r, MAP_WIDTH)] === IMPROVEMENT_LOGGING);
   }
 
-  // Wall — 3-turn construction: NONE → WALL_1 → WALL_2 → WALL
+  // Wall construction — startWallConstruction + endPlayerTurn auto-advance
   let stoneHex = null;
   for (let tr = 0; tr < MAP_HEIGHT && !stoneHex; tr++) {
     for (let tq = 0; tq < MAP_WIDTH && !stoneHex; tq++) {
@@ -358,27 +358,69 @@ export function runTests(assert) {
     wGame.crew[0].q        = stoneHex.q;
     wGame.crew[0].r        = stoneHex.r;
     wGame.crew[0].sleeping = false;
-    // Turn 1: NONE → WALL_1
-    assert('wall turn 1 returns game',
-      improveTerrain(wGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
-    assert('wall turn 1 sets WALL_1',
+
+    assert('startWallConstruction returns game on stone',
+      startWallConstruction(wGame, 0, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
+    assert('startWallConstruction sets WALL_1',
       wGame.improvements[hexToIndex(stoneHex.q, stoneHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_1);
-    // Turn 2: WALL_1 → WALL_2
-    wGame.crew[0].ap = CREW_AP;
-    assert('wall turn 2 returns game',
-      improveTerrain(wGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
-    assert('wall turn 2 sets WALL_2',
+    assert('building crew is marked building',
+      wGame.crew[0].building === true);
+    assert('building crew has buildTurnsRemaining 2',
+      wGame.crew[0].buildTurnsRemaining === 2);
+    assert('building crew AP is consumed',
+      wGame.crew[0].ap === 0);
+
+    endPlayerTurn(wGame, MAP_WIDTH, MAP_HEIGHT);
+    assert('after 1 endPlayerTurn: WALL_2',
       wGame.improvements[hexToIndex(stoneHex.q, stoneHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_2);
-    // Turn 3: WALL_2 → WALL
-    wGame.crew[0].ap = CREW_AP;
-    assert('wall turn 3 returns game',
-      improveTerrain(wGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
-    assert('wall turn 3 sets complete WALL',
+    assert('after 1 endPlayerTurn: still building',
+      wGame.crew[0].building === true);
+    assert('after 1 endPlayerTurn: AP stays 0',
+      wGame.crew[0].ap === 0);
+
+    endPlayerTurn(wGame, MAP_WIDTH, MAP_HEIGHT);
+    assert('after 2 endPlayerTurns: WALL complete',
       wGame.improvements[hexToIndex(stoneHex.q, stoneHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL);
-    // Turn 4: wall already complete
-    wGame.crew[0].ap = CREW_AP;
-    assert('wall returns null when already complete',
-      improveTerrain(wGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+    assert('after 2 endPlayerTurns: building = false',
+      wGame.crew[0].building === false);
+    assert('after 2 endPlayerTurns: AP restored',
+      wGame.crew[0].ap === CREW_AP);
+
+    assert('startWallConstruction returns null when hex already improved',
+      startWallConstruction(wGame, 0, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+
+    // Cannot start a second build on the same hex while one is in progress
+    const wGame2 = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+    wGame2.crew[0].aboard   = false;
+    wGame2.crew[0].shipId   = null;
+    wGame2.crew[0].q        = stoneHex.q;
+    wGame2.crew[0].r        = stoneHex.r;
+    wGame2.crew[0].sleeping = false;
+    startWallConstruction(wGame2, 0, terrain, MAP_WIDTH, MAP_HEIGHT);
+    assert('startWallConstruction returns null when already building',
+      startWallConstruction(wGame2, 0, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+
+    // Building guards: building crew cannot move, embark, or use improveTerrain
+    const wGame3 = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+    wGame3.crew[0].aboard   = false;
+    wGame3.crew[0].shipId   = null;
+    wGame3.crew[0].q        = stoneHex.q;
+    wGame3.crew[0].r        = stoneHex.r;
+    wGame3.crew[0].sleeping = false;
+    startWallConstruction(wGame3, 0, terrain, MAP_WIDTH, MAP_HEIGHT);
+    wGame3.crew[0].ap = CREW_AP; // restore AP so we test the building guard, not AP=0
+
+    const adjWalkable3 = neighbors(stoneHex.q, stoneHex.r).find(([nq, nr]) => {
+      if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) return false;
+      const nt = terrain[hexToIndex(nq, nr, MAP_WIDTH)];
+      return nt !== 'ocean' && nt !== 'mountain';
+    });
+    if (adjWalkable3) {
+      assert('moveCrew returns null for building crew',
+        moveCrew(wGame3, 0, adjWalkable3[0], adjWalkable3[1], terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+    }
+    assert('improveTerrain returns null for building crew',
+      improveTerrain(wGame3, 0, IMPROVEMENT_FARM, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
   }
 
   if (grasslandHex) {
@@ -388,9 +430,9 @@ export function runTests(assert) {
     wgGame.crew[0].q        = grasslandHex.q;
     wgGame.crew[0].r        = grasslandHex.r;
     wgGame.crew[0].sleeping = false;
-    assert('wall turn 1 returns game on grassland',
-      improveTerrain(wgGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
-    assert('wall turn 1 sets WALL_1 on grassland',
+    assert('startWallConstruction returns game on grassland',
+      startWallConstruction(wgGame, 0, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
+    assert('startWallConstruction sets WALL_1 on grassland',
       wgGame.improvements[hexToIndex(grasslandHex.q, grasslandHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_1);
   }
 
@@ -401,9 +443,9 @@ export function runTests(assert) {
     wfGame.crew[0].q        = forestHex.q;
     wfGame.crew[0].r        = forestHex.r;
     wfGame.crew[0].sleeping = false;
-    assert('wall turn 1 returns game on forest',
-      improveTerrain(wfGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
-    assert('wall turn 1 sets WALL_1 on forest',
+    assert('startWallConstruction returns game on forest',
+      startWallConstruction(wfGame, 0, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
+    assert('startWallConstruction sets WALL_1 on forest',
       wfGame.improvements[hexToIndex(forestHex.q, forestHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_1);
   }
 

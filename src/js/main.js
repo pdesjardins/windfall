@@ -2,7 +2,7 @@
 
 import { generateTerrain } from './engine/terrain.js';
 import { MAP_WIDTH, MAP_HEIGHT, neighbors, inBounds, hexToIndex } from './engine/hex.js';
-import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn, improveTerrain, unloadCrew, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_WALL_1, IMPROVEMENT_WALL_2, IMPROVEMENT_NONE } from './engine/game.js';
+import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn, improveTerrain, startWallConstruction, unloadCrew, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_NONE } from './engine/game.js';
 import { t, WIND_NAMES, SAIL_NAMES } from './locale/en.js';
 import { pointOfSail, moveApCost } from './engine/wind.js';
 import * as renderer from './ui/renderer.js';
@@ -132,7 +132,12 @@ window.addEventListener('keydown', e => {
       const avail = availableImprovements(crew);
       const pick  = parseInt(e.key, 10) - 1;
       if (pick >= 0 && pick < avail.length) {
-        improveTerrain(game, crew.id, avail[pick], terrain, MAP_WIDTH, MAP_HEIGHT);
+        const chosen = avail[pick];
+        if (chosen === IMPROVEMENT_WALL) {
+          startWallConstruction(game, crew.id, terrain, MAP_WIDTH, MAP_HEIGHT);
+        } else {
+          improveTerrain(game, crew.id, chosen, terrain, MAP_WIDTH, MAP_HEIGHT);
+        }
         exitBuildMode();
         afterAction();
       }
@@ -346,10 +351,9 @@ function isUnitExhausted(sel) {
 }
 
 function availableImprovements(crew) {
-  if (!crew || crew.aboard || crew.ap < 1) return [];
+  if (!crew || crew.aboard || crew.ap < 1 || crew.sleeping || crew.building) return [];
   const idx = hexToIndex(crew.q, crew.r, MAP_WIDTH);
   const cur = game.improvements[idx];
-  if (cur === IMPROVEMENT_WALL_1 || cur === IMPROVEMENT_WALL_2) return [IMPROVEMENT_WALL];
   if (cur !== IMPROVEMENT_NONE) return [];
   const t = terrain[idx];
   if (t === 'grassland') return [IMPROVEMENT_FARM,    IMPROVEMENT_WALL];
@@ -542,14 +546,18 @@ function updatePanel() {
     if (c) {
       if (buildMode) {
         const avail  = availableImprovements(c);
-        const cur    = game.improvements[hexToIndex(c.q, c.r, MAP_WIDTH)];
-        const wallLabel = cur === IMPROVEMENT_WALL_1 ? t('improvement_wall_stage_2') :
-                          cur === IMPROVEMENT_WALL_2 ? t('improvement_wall_stage_3') : t('improvement_wall_stage_1');
-        const labels = { [IMPROVEMENT_FARM]: t('improvement_farm'), [IMPROVEMENT_LOGGING]: t('improvement_logging_camp'), [IMPROVEMENT_WALL]: wallLabel };
-        const opts   = avail.map((imp, i) => `<p>${i + 1} — ${labels[imp]}</p>`).join('');
+        const labels = {
+          [IMPROVEMENT_FARM]:    t('improvement_farm'),
+          [IMPROVEMENT_LOGGING]: t('improvement_logging_camp'),
+          [IMPROVEMENT_WALL]:    t('improvement_wall_stage_1'),
+        };
+        const opts = avail.map((imp, i) => `<p>${i + 1} — ${labels[imp]}</p>`).join('');
         elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_build_label')}</p>${opts}<p>${t('crew_build_cancel')}</p>`;
       } else if (c.sleeping) {
         elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_status_encamped')}</p>`;
+      } else if (c.building) {
+        const stage = 3 - c.buildTurnsRemaining;
+        elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_building_wall', { stage })}</p>`;
       } else {
         const avail     = availableImprovements(c);
         const buildHint = avail.length > 0 ? `<p>${t('crew_hint_build')}</p>` : '';

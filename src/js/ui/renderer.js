@@ -65,7 +65,7 @@ let _devFogOff     = false;
 let _selection     = null;
 let _validTargets  = [];
 let _crew          = [];
-let _improvements  = null; // Uint8Array parallel to terrain — 0=none,1=farm,2=logging
+let _improvements  = null; // Uint8Array parallel to terrain — 0=none,1=farm,2=logging,3=wall,4=wall_1,5=wall_2
 let _buildTargetHex = null; // {q,r} of the hex currently highlighted for build mode, or null
 
 function buildStars(w, h) {
