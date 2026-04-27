@@ -112,7 +112,7 @@ Crew are the player's land-based units. All crew are identical in capability.
 **Capabilities:**
 - Navigate land hexes (1 AP per hex)
 - Sail a ship (requires at least 1 crew aboard)
-- Improve a land hex into a wall segment (5 turns; valid on grassland, forest, stone)
+- Improve a land hex into a wall segment (3 turns committed; valid on grassland, forest, stone)
 - Improve grassland into farm (cost TBD; mutually exclusive with wall)
 - Improve forest into logging camp (cost TBD; mutually exclusive with wall)
 - Attack enemy units by moving onto their hex (1 AP; see Combat)
@@ -179,10 +179,13 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 
 ### Construction
 
-1. A crew unit stops on a grassland, forest, or stone hex and spends 5 turns building.
-2. After 5 turns, that hex becomes a **wall** improvement, replacing any prior improvement on that hex.
-3. The crew unit may then move to an adjacent hex and repeat.
-4. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fort**.
+1. A crew unit stops on a grassland, forest, or stone hex and initiates building (B key). The crew enters **building** status immediately.
+2. Building status locks the crew to that hex for 3 consecutive turns: the turn building begins plus 2 turns in which the crew skips all other actions. The crew cannot move, embark, improve terrain, or perform any other action while building.
+3. After all 3 turns complete, the hex becomes a **wall** improvement. No partial wall is visible or usable during construction — WALL_1 and WALL_2 are internal tracking states only; they do not fire cannons, do not contribute to fort-loop detection, and satisfy no wall condition.
+4. If the building crew is destroyed during construction, the work is abandoned. No partial improvement is left on the hex.
+5. Only one crew unit may build on a given hex at a time.
+6. The crew unit may then move to an adjacent hex and repeat.
+7. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fort**.
 
 Mountain hexes participate as natural wall segments without requiring any improvement. The closed-loop detection replaces the prior flood-fill model.
 
@@ -385,3 +388,5 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-22 | Movement budget (6 pts) with per-direction costs, not flat per-turn AP | Flat AP allowed multiple close-reach steps per turn, which should be more expensive than running. Budget model correctly enforces 3 running, 2 broad-reach, or 1 close-reach move per turn, and allows mixed-direction turns. |
 | 2026-04-22 | In irons blocks only windward hex, not all movement | Blocking all movement stranded ships completely. In irons describes a heading relationship, not a turn-long locked state. The ship can always turn and move in non-windward directions. |
 | 2026-04-22 | Ship starts facing downwind | Guarantees 3 running moves at game start. Prevents the poor UX of loading a new game and being immediately in irons. |
+| 2026-04-26 | Wall construction is a committed 3-turn action; no partial completion | Allowing crews to build one stage and walk away makes wall placement feel like a cheap incremental action and breaks the "this hex is or isn't a wall" invariant. The locked-builder model makes construction a meaningful commitment and keeps wall state binary from the game's perspective. |
+| 2026-04-26 | Wall construction time standardized to 3 turns (was 5 in spec, 3 in user docs) | User doc was correct; spec contained an earlier draft value. 3 turns matches the WALL_1/WALL_2/WALL stage count and feels right for early playtesting. |

@@ -5,7 +5,11 @@ A fort is a defensive structure your crew builds on land. It is not placed as a 
 
 ## Building Walls
 
-Any crew member can spend a turn improving a land hex into a wall segment. Building one wall segment takes **3 turns**. Each turn of work advances the segment through visible construction stages — foundation, partial crenellations, completed wall.
+To build a wall segment, move a crew member onto a land hex and press **B**. The crew immediately enters **building** status and stays locked to that hex for 3 consecutive turns. They cannot move, board a ship, or do anything else while building. When the 3 turns are up, the wall segment is complete.
+
+Construction is all or nothing. There is no partial wall. While your crew is working, the hex shows a construction marker, but it is not yet a wall — it does not fire cannons and does not count toward closing a fort loop. Only the completed wall does.
+
+If the building crew is killed before the 3 turns are up, the work is lost. Nothing is left on the hex.
 
 Wall segments can be built on three terrain types:
 

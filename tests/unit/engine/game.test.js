@@ -147,10 +147,11 @@ export function runTests(assert) {
   }
 
   if (crewStart && crewTarget) {
-    game5.crew[0].aboard  = false;
-    game5.crew[0].shipId  = null;
-    game5.crew[0].q       = crewStart.q;
-    game5.crew[0].r       = crewStart.r;
+    game5.crew[0].aboard   = false;
+    game5.crew[0].shipId   = null;
+    game5.crew[0].q        = crewStart.q;
+    game5.crew[0].r        = crewStart.r;
+    game5.crew[0].sleeping = false;
 
     assert('moveCrew returns null when crew is aboard',
       moveCrew(game5, 1, crewTarget.q, crewTarget.r, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
@@ -161,6 +162,15 @@ export function runTests(assert) {
     assert('moveCrew updates crew position r', game5.crew[0].r === crewTarget.r);
     assert('moveCrew deducts AP', game5.crew[0].ap === CREW_AP - 1);
 
+    const sleepMoveGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+    sleepMoveGame.crew[0].aboard   = false;
+    sleepMoveGame.crew[0].shipId   = null;
+    sleepMoveGame.crew[0].q        = crewStart.q;
+    sleepMoveGame.crew[0].r        = crewStart.r;
+    // sleeping stays true (initGame default) — no override needed
+    assert('moveCrew returns null for sleeping crew',
+      moveCrew(sleepMoveGame, 0, crewTarget.q, crewTarget.r, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+
     game5.crew[0].ap = 0;
     assert('moveCrew returns null with 0 AP',
       moveCrew(game5, 0, crewStart.q, crewStart.r, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
@@ -168,10 +178,11 @@ export function runTests(assert) {
     assert('moveCrew returns null for non-adjacent hex',
       (() => {
         const g = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-        g.crew[0].aboard = false;
-        g.crew[0].shipId = null;
-        g.crew[0].q = crewStart.q;
-        g.crew[0].r = crewStart.r;
+        g.crew[0].aboard   = false;
+        g.crew[0].shipId   = null;
+        g.crew[0].q        = crewStart.q;
+        g.crew[0].r        = crewStart.r;
+        g.crew[0].sleeping = false;
         return moveCrew(g, 0, crewStart.q + 5, crewStart.r + 5, terrain, MAP_WIDTH, MAP_HEIGHT) === null;
       })());
   }
@@ -236,6 +247,27 @@ export function runTests(assert) {
   assert('endPlayerTurn puts all aboard crew back to sleep',
     game9.crew.filter(c => c.aboard).every(c => c.sleeping));
 
+  // embarkCrew — sleeping land crew is rejected
+  if (crewStart) {
+    const oceanAdjToCrew = neighbors(crewStart.q, crewStart.r)
+      .find(([nq, nr]) =>
+        inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT) &&
+        terrain[hexToIndex(nq, nr, MAP_WIDTH)] === 'ocean'
+      );
+    if (oceanAdjToCrew) {
+      const sleepEmbarkGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+      sleepEmbarkGame.ships[0].q     = oceanAdjToCrew[0];
+      sleepEmbarkGame.ships[0].r     = oceanAdjToCrew[1];
+      sleepEmbarkGame.crew[0].aboard   = false;
+      sleepEmbarkGame.crew[0].shipId   = null;
+      sleepEmbarkGame.crew[0].q        = crewStart.q;
+      sleepEmbarkGame.crew[0].r        = crewStart.r;
+      // sleeping stays true (initGame default) — no override needed
+      assert('embarkCrew returns null for sleeping crew',
+        embarkCrew(sleepEmbarkGame, 0, 0, MAP_WIDTH, MAP_HEIGHT) === null);
+    }
+  }
+
   // improveTerrain — find a grassland and a forest hex for testing
   let grasslandHex = null, forestHex = null;
   for (let tr = 0; tr < MAP_HEIGHT && (!grasslandHex || !forestHex); tr++) {
@@ -248,10 +280,11 @@ export function runTests(assert) {
 
   if (grasslandHex) {
     const gGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-    gGame.crew[0].aboard = false;
-    gGame.crew[0].shipId = null;
-    gGame.crew[0].q      = grasslandHex.q;
-    gGame.crew[0].r      = grasslandHex.r;
+    gGame.crew[0].aboard   = false;
+    gGame.crew[0].shipId   = null;
+    gGame.crew[0].q        = grasslandHex.q;
+    gGame.crew[0].r        = grasslandHex.r;
+    gGame.crew[0].sleeping = false;
 
     assert('improveTerrain returns game for valid farm',
       improveTerrain(gGame, 0, IMPROVEMENT_FARM, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
@@ -262,6 +295,15 @@ export function runTests(assert) {
 
     assert('improveTerrain returns null when already improved',
       improveTerrain(gGame, 0, IMPROVEMENT_FARM, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
+
+    const sleepImproveGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
+    sleepImproveGame.crew[0].aboard   = false;
+    sleepImproveGame.crew[0].shipId   = null;
+    sleepImproveGame.crew[0].q        = grasslandHex.q;
+    sleepImproveGame.crew[0].r        = grasslandHex.r;
+    sleepImproveGame.crew[0].sleeping = true;
+    assert('improveTerrain returns null for sleeping crew',
+      improveTerrain(sleepImproveGame, 0, IMPROVEMENT_FARM, terrain, MAP_WIDTH, MAP_HEIGHT) === null);
 
     const noApGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
     noApGame.crew[0].aboard = false;
@@ -289,10 +331,11 @@ export function runTests(assert) {
 
   if (forestHex) {
     const fGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-    fGame.crew[0].aboard = false;
-    fGame.crew[0].shipId = null;
-    fGame.crew[0].q      = forestHex.q;
-    fGame.crew[0].r      = forestHex.r;
+    fGame.crew[0].aboard   = false;
+    fGame.crew[0].shipId   = null;
+    fGame.crew[0].q        = forestHex.q;
+    fGame.crew[0].r        = forestHex.r;
+    fGame.crew[0].sleeping = false;
 
     assert('improveTerrain returns game for valid logging camp',
       improveTerrain(fGame, 0, IMPROVEMENT_LOGGING, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
@@ -310,10 +353,11 @@ export function runTests(assert) {
 
   if (stoneHex) {
     const wGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-    wGame.crew[0].aboard = false;
-    wGame.crew[0].shipId = null;
-    wGame.crew[0].q      = stoneHex.q;
-    wGame.crew[0].r      = stoneHex.r;
+    wGame.crew[0].aboard   = false;
+    wGame.crew[0].shipId   = null;
+    wGame.crew[0].q        = stoneHex.q;
+    wGame.crew[0].r        = stoneHex.r;
+    wGame.crew[0].sleeping = false;
     // Turn 1: NONE → WALL_1
     assert('wall turn 1 returns game',
       improveTerrain(wGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
@@ -339,10 +383,11 @@ export function runTests(assert) {
 
   if (grasslandHex) {
     const wgGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-    wgGame.crew[0].aboard = false;
-    wgGame.crew[0].shipId = null;
-    wgGame.crew[0].q      = grasslandHex.q;
-    wgGame.crew[0].r      = grasslandHex.r;
+    wgGame.crew[0].aboard   = false;
+    wgGame.crew[0].shipId   = null;
+    wgGame.crew[0].q        = grasslandHex.q;
+    wgGame.crew[0].r        = grasslandHex.r;
+    wgGame.crew[0].sleeping = false;
     assert('wall turn 1 returns game on grassland',
       improveTerrain(wgGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
     assert('wall turn 1 sets WALL_1 on grassland',
@@ -351,10 +396,11 @@ export function runTests(assert) {
 
   if (forestHex) {
     const wfGame = initGame(seed, terrain, MAP_WIDTH, MAP_HEIGHT);
-    wfGame.crew[0].aboard = false;
-    wfGame.crew[0].shipId = null;
-    wfGame.crew[0].q      = forestHex.q;
-    wfGame.crew[0].r      = forestHex.r;
+    wfGame.crew[0].aboard   = false;
+    wfGame.crew[0].shipId   = null;
+    wfGame.crew[0].q        = forestHex.q;
+    wfGame.crew[0].r        = forestHex.r;
+    wfGame.crew[0].sleeping = false;
     assert('wall turn 1 returns game on forest',
       improveTerrain(wfGame, 0, IMPROVEMENT_WALL, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
     assert('wall turn 1 sets WALL_1 on forest',

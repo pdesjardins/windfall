@@ -51,7 +51,9 @@ export function initGame(seed, terrain, width, height) {
 // Farm/logging complete in one turn. Wall takes three turns (NONE→WALL_1→WALL_2→WALL).
 export function improveTerrain(game, crewId, improvementType, terrain, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
-  if (!crew || crew.aboard || crew.ap < 1) return null;
+  if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.ap < 1) return null;
 
   const idx = hexToIndex(crew.q, crew.r, width);
   const cur = game.improvements[idx];
@@ -141,6 +143,7 @@ export function disembarkCrew(game, crewId, targetQ, targetR, terrain, width, he
 export function embarkCrew(game, crewId, shipId, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
   if (crew.ap < 1) return null;
 
   const ship = game.ships.find(s => s.id === shipId);
@@ -162,6 +165,7 @@ export function embarkCrew(game, crewId, shipId, width, height) {
 export function moveCrew(game, crewId, targetQ, targetR, terrain, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
   if (crew.ap < 1) return null;
   if (!inBounds(targetQ, targetR, width, height)) return null;
 

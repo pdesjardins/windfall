@@ -84,6 +84,20 @@ The panel shows `Crew: X / game.crew.length`. `game.crew.length` is always 4 (to
 
 ---
 
+## Design Clarifications Needed
+
+### 8. Wall construction allows abandonment mid-build (design intent violated)
+
+Current behavior: pressing B once advances the wall one stage (none → WALL_1 → WALL_2 → WALL). A crew member can build one stage and walk away. The partial wall (WALL_1 or WALL_2) persists on the hex. Another crew can continue later, or the same crew can return. This makes wall construction a 1-AP-per-stage operation spread across any number of turns and crew members.
+
+Design intent: Wall construction is an all-or-nothing commitment. When a crew member starts building, they enter **building** status and are locked to that hex for 3 consecutive turns. They cannot move, embark, or perform other actions while building. No wall improvement is visible or usable until all 3 turns complete. If the building crew is destroyed during construction, the work is abandoned — no partial improvement is left on the hex. Only one crew member can build on a given hex at a time.
+
+The 3-turn count is: the turn the crew initiates building + 2 subsequent turns skipped. WALL_1 and WALL_2 may remain as internal tracking state (for save/resume and rendering a "construction in progress" indicator), but they must not be treated as wall improvements — they must not fire cannons, must not contribute to fort-loop detection, and must not satisfy any wall condition.
+
+**Fix:** Add a `building` boolean and `buildTurnsRemaining` counter to crew. On B-press, set `building = true`, `buildTurnsRemaining = 2`. On `endPlayerTurn`, for each building crew: if `buildTurnsRemaining > 0`, decrement; if `buildTurnsRemaining === 0`, complete the wall and clear building state. Guard `moveCrew`, `embarkCrew`, `improveTerrain`, and any other action against `crew.building`. Remove WALL_1 and WALL_2 from conditions that treat a hex as a wall (cannon fire, loop detection, fort capability checks).
+
+---
+
 ## Not Fixing (for the record)
 
 - **`shipMoveTargets` doesn't check `sleeping`** — sleeping crew can still pilot the ship. This is a design decision: crew are resting *aboard*, not operating independently. Only disembark requires an awake crew.
