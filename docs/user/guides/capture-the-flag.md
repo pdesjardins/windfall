@@ -16,7 +16,7 @@ Your own half's hiding location is your destination for the return journey. Choo
 
 ### 1. Hide Your Own Half
 
-Before you go hunting, make sure your Concordance half is hidden somewhere defensible. Move a crew member carrying it onto a land hex and hide it there. Inside a live fortification is ideal — the fort's cannons will protect it if the enemy comes looking.
+Before you go hunting, make sure your Concordance half is hidden somewhere defensible. Move a crew member carrying it onto a land hex and hide it there. Inside a live fort is ideal — the fort's cannons will protect it if the enemy comes looking.
 
 ### 2. Find the Enemy's Half
 
@@ -34,7 +34,7 @@ Move the carrier to the same hex where you hid your own Concordance half. The ca
 
 **This is the most dangerous part of the game.** If the carrier is destroyed while holding the enemy's half, you lose immediately. Plan your route carefully:
 
-- Avoid hexes within cannon range of enemy fortifications.
+- Avoid hexes within cannon range of enemy forts.
 - Use your own ships and crew to escort the carrier.
 - Move the carrier aboard a ship for faster travel across water where possible.
 
@@ -46,10 +46,10 @@ When the carrier reaches the hex containing your hidden half, both halves are to
 
 ## Protecting Your Own Half
 
-While you are pursuing the enemy's half, your opponent is pursuing yours. Keep it well-hidden and inside a fortification if possible. If the enemy captures your half and reunites it with their own before you can intercept, you lose.
+While you are pursuing the enemy's half, your opponent is pursuing yours. Keep it well-hidden and inside a fort if possible. If the enemy captures your half and reunites it with their own before you can intercept, you lose.
 
 ## Related Topics
 
 - [The Concordance](../concepts/flag.md)
-- [Fortifications](../concepts/fortifications.md)
+- [Forts](../concepts/forts.md)
 - [Crew and Ships](../concepts/units.md)

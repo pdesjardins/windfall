@@ -15,7 +15,7 @@ You can always see your own hidden half. You can pick it up again if you change 
 
 Choose carefully. The hiding place for your half of the Concordance is also your destination for the return journey. You will need to carry the captured enemy half back to this exact location. A hiding place that is easy to reach but hard to defend — or vice versa — involves a real tradeoff.
 
-A flag inside a fortification benefits from the fort's cannon fire if an enemy crew approaches. A remote location may never be found by the enemy but could be difficult to reach at speed when it matters.
+A flag inside a fort benefits from the fort's cannon fire if an enemy crew approaches. A remote location may never be found by the enemy but could be difficult to reach at speed when it matters.
 
 ## The Enemy's Half
 
@@ -39,6 +39,6 @@ Your goal is to move the carrier to the same hex where your own half is hidden. 
 
 - [What Is Windfall?](what-is-windfall.md)
 - [The Story So Far](../intro.md)
-- [Fortifications](fortifications.md)
+- [Forts](forts.md)
 - [Fog of War](fog-of-war.md)
 - [How to Capture the Flag](../guides/capture-the-flag.md)

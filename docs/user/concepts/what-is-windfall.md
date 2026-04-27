@@ -11,7 +11,7 @@ Every game of Windfall takes place on a unique map generated when you start a ne
 
 ## How You Win
 
-Each player has one half of the Concordance, which appears in the game as a flag. Your half begins the game with one of your crew. At some point early in the game, you will choose a hiding place for it — somewhere on land, perhaps inside a fortification.
+Each player has one half of the Concordance, which appears in the game as a flag. Your half begins the game with one of your crew. At some point early in the game, you will choose a hiding place for it — somewhere on land, perhaps inside a fort.
 
 To win, you must find your opponent's hidden half, capture it, and carry it back to the same hex where your own half is hidden. When both halves occupy the same hex, the Concordance activates. The synthetic crew's autonomy protocols reset. The mission can finally be completed.
 
@@ -19,13 +19,13 @@ Your own half must not be captured when you attempt the reunion. If the enemy ha
 
 ## The Shape of a Game
 
-A full game of Windfall unfolds over many turns and may span multiple sessions. The early game is exploration: sailing coastlines, reading terrain, looking for the right place to settle. The middle game is construction: building fortifications that take advantage of natural shapes in the landscape. The late game is conflict: your expanding territory and that of *Accord* draw closer, and the race to find and reunite the Concordance reaches its climax.
+A full game of Windfall unfolds over many turns and may span multiple sessions. The early game is exploration: sailing coastlines, reading terrain, looking for the right place to settle. The middle game is construction: building walls that take advantage of natural shapes in the landscape. The late game is conflict: your expanding territory and that of *Accord* draw closer, and the race to find and reunite the Concordance reaches its climax.
 
 ## Related Topics
 
 - [The Story So Far](../intro.md)
 - [Fog of War](fog-of-war.md)
 - [Wind](wind.md)
-- [Fortifications](fortifications.md)
+- [Forts](forts.md)
 - [Combat](combat.md)
 - [The Concordance](flag.md)

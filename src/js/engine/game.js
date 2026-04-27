@@ -9,6 +9,13 @@ export const CREW_SIGHT_RANGE = 2;
 export const CREW_AP          = 1;
 export const CREW_COUNT       = 4;
 
+export const IMPROVEMENT_NONE    = 0;
+export const IMPROVEMENT_FARM    = 1;
+export const IMPROVEMENT_LOGGING = 2;
+export const IMPROVEMENT_WALL    = 3; // complete wall (3 turns to build)
+export const IMPROVEMENT_WALL_1  = 4; // wall under construction — 1 of 3 turns done
+export const IMPROVEMENT_WALL_2  = 5; // wall under construction — 2 of 3 turns done
+
 export const PLAYER_COLORS = {
   human: '#e8d5b0',
   ai:    '#4aacbe',
@@ -30,12 +37,65 @@ export function initGame(seed, terrain, width, height) {
   };
 
   const crew = Array.from({ length: CREW_COUNT }, (_, id) => ({
-    id, aboard: true, shipId: 0, q: null, r: null, ap: CREW_AP, sleeping: false,
+    id, aboard: true, shipId: 0, q: null, r: null, ap: CREW_AP, sleeping: true,
+    building: false, buildTurnsRemaining: 0,
   }));
 
   setVisible(fog, q, r, SHIP_SIGHT_RANGE, width, height);
 
-  return { seed, turn: 1, ships: [startShip], nextShipId: 1, crew, fog, wind: { dir: windDir } };
+  const improvements = new Uint8Array(width * height); // all IMPROVEMENT_NONE (0)
+
+  return { seed, turn: 1, ships: [startShip], nextShipId: 1, crew, fog, wind: { dir: windDir }, improvements };
+}
+
+// Improve the hex a crew member is standing on. Costs 1 crew AP.
+// Farm and logging complete in one turn. Wall construction uses startWallConstruction instead.
+export function improveTerrain(game, crewId, improvementType, terrain, width, height) {
+  const crew = game.crew.find(c => c.id === crewId);
+  if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.building) return null;
+  if (crew.ap < 1) return null;
+
+  const idx = hexToIndex(crew.q, crew.r, width);
+  const cur = game.improvements[idx];
+  const t   = terrain[idx];
+
+  if (improvementType === IMPROVEMENT_FARM) {
+    if (cur !== IMPROVEMENT_NONE) return null;
+    if (t !== 'grassland')        return null;
+    game.improvements[idx] = IMPROVEMENT_FARM;
+  } else if (improvementType === IMPROVEMENT_LOGGING) {
+    if (cur !== IMPROVEMENT_NONE) return null;
+    if (t !== 'forest')           return null;
+    game.improvements[idx] = IMPROVEMENT_LOGGING;
+  } else {
+    return null;
+  }
+
+  crew.ap -= 1;
+  return game;
+}
+
+// Begin wall construction on the crew's current hex. The crew commits for 2 subsequent turns;
+// endPlayerTurn advances the build automatically and completes it without further input.
+export function startWallConstruction(game, crewId, terrain, width, height) {
+  const crew = game.crew.find(c => c.id === crewId);
+  if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.building) return null;
+  if (crew.ap < 1) return null;
+
+  const idx = hexToIndex(crew.q, crew.r, width);
+  if (game.improvements[idx] !== IMPROVEMENT_NONE) return null;
+  const t = terrain[idx];
+  if (t !== 'grassland' && t !== 'forest' && t !== 'stone') return null;
+
+  game.improvements[idx]   = IMPROVEMENT_WALL_1;
+  crew.building            = true;
+  crew.buildTurnsRemaining = 2;
+  crew.ap -= 1;
+  return game;
 }
 
 // Move a ship to an adjacent ocean hex. Requires at least one crew aboard that ship.
@@ -66,6 +126,7 @@ export function moveShip(game, shipId, targetQ, targetR, terrain, width, height)
 export function disembarkCrew(game, crewId, targetQ, targetR, terrain, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || !crew.aboard) return null;
+  if (crew.sleeping) return null;
   if (crew.ap < 1) return null;
   if (!inBounds(targetQ, targetR, width, height)) return null;
 
@@ -94,6 +155,8 @@ export function disembarkCrew(game, crewId, targetQ, targetR, terrain, width, he
 export function embarkCrew(game, crewId, shipId, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.building) return null;
   if (crew.ap < 1) return null;
 
   const ship = game.ships.find(s => s.id === shipId);
@@ -115,6 +178,8 @@ export function embarkCrew(game, crewId, shipId, width, height) {
 export function moveCrew(game, crewId, targetQ, targetR, terrain, width, height) {
   const crew = game.crew.find(c => c.id === crewId);
   if (!crew || crew.aboard) return null;
+  if (crew.sleeping) return null;
+  if (crew.building) return null;
   if (crew.ap < 1) return null;
   if (!inBounds(targetQ, targetR, width, height)) return null;
 
@@ -148,17 +213,43 @@ export function endPlayerTurn(game, width, height) {
   game.turn     += 1;
   game.wind.dir  = applyShift(game.wind.dir, windShift(game.seed, game.turn));
   for (const ship of game.ships) ship.ap = SHIP_MOVE_BUDGET;
-  for (const c of game.crew) c.ap = CREW_AP;
+  for (const c of game.crew) {
+    if (c.building) {
+      c.buildTurnsRemaining--;
+      if (c.buildTurnsRemaining === 0) {
+        game.improvements[hexToIndex(c.q, c.r, width)] = IMPROVEMENT_WALL;
+        c.building = false;
+        c.ap = CREW_AP;
+      } else {
+        const idx = hexToIndex(c.q, c.r, width);
+        if (game.improvements[idx] === IMPROVEMENT_WALL_1) game.improvements[idx] = IMPROVEMENT_WALL_2;
+        c.ap = 0;
+      }
+    } else {
+      c.ap = CREW_AP;
+      if (c.aboard) c.sleeping = true;
+    }
+  }
+  return game;
+}
+
+// Wake all sleeping crew aboard a ship so they can disembark this turn.
+export function unloadCrew(game, shipId) {
+  const ship = game.ships.find(s => s.id === shipId);
+  if (!ship) return null;
+  const sleeping = game.crew.filter(c => c.aboard && c.shipId === shipId && c.sleeping);
+  if (sleeping.length === 0) return null;
+  for (const c of sleeping) c.sleeping = false;
   return game;
 }
 
 function findStartingOceanHex(terrain, width, height, seed) {
   const corner  = seed % 4;
-  const qLeft   = corner === 1 || corner === 3;
+  const qRight  = corner === 1 || corner === 3;
   const rBottom = corner === 2 || corner === 3;
 
-  const qMin = qLeft   ? Math.floor(width  * 3 / 4) : START_EDGE_MARGIN;
-  const qMax = qLeft   ? width  - START_EDGE_MARGIN  : Math.floor(width  / 4);
+  const qMin = qRight  ? Math.floor(width  * 3 / 4) : START_EDGE_MARGIN;
+  const qMax = qRight  ? width  - START_EDGE_MARGIN  : Math.floor(width  / 4);
   const rMin = rBottom ? Math.floor(height * 3 / 4) : START_EDGE_MARGIN;
   const rMax = rBottom ? height - START_EDGE_MARGIN  : Math.floor(height / 4);
 

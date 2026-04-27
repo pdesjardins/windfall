@@ -31,7 +31,7 @@ Your first priority is exploration. Sail along coastlines to reveal terrain. You
 
 Your second priority is hiding your flag. Do not leave it aboard your ship forever — a ship is a mobile target. When you find a promising piece of land, consider landing crew and hiding the flag in a location that will be hard to find.
 
-You do not need to build a fortification before hiding the flag. A remote, unexplored-looking hex can be a valid hiding spot. You can always pick the flag up and move it later.
+You do not need to build a fort before hiding the flag. A remote, unexplored-looking hex can be a valid hiding spot. You can always pick the flag up and move it later.
 
 ## Result
 

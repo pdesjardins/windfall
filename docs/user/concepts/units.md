@@ -7,7 +7,7 @@ Windfall gives you two types of units: crew on land and ships at sea. All crew a
 
 ## Crew
 
-Crew are your land-based units. They explore coastlines, build fortifications, and carry the flag.
+Crew are your land-based units. They explore coastlines, build walls, and carry the flag.
 
 **Action points:** 1 per turn. Each move costs 1 AP. Once a crew member has moved, they are done for the turn.
 

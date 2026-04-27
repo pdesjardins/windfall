@@ -3,7 +3,7 @@
 
 ## Overview
 
-Windfall is a turn-based nautical strategy game playable in a modern desktop browser with no installation required. The player commands a ship and crew, explores a procedurally generated world of land and ocean, builds fortifications, and competes against an AI opponent in a capture-the-flag scenario.
+Windfall is a turn-based nautical strategy game playable in a modern desktop browser with no installation required. The player commands a ship and crew, explores a procedurally generated world of land and ocean, builds walls, and competes against an AI opponent in a capture-the-flag scenario.
 
 The game is free to play. It is distributed as a static website. No account, server, or internet connection is required after the initial page load.
 
@@ -25,7 +25,7 @@ The player commands *Resolution*. The AI commands *Accord*.
 - **Simple rules, meaningful decisions.** All crew are identical. All ships are identical. Complexity comes from terrain, positioning, and timing — not from unit differentiation or resource micromanagement.
 - **Abstracted, not realistic.** Production of crew and ships happens near grassland and forests without explicit resource counting. Being near the right terrain is sufficient. Exact quantities are tunable constants, not emergent from supply chains.
 - **Long sessions with save/resume.** A full game may span multiple real-world sessions. Players should be able to stop, think about their situation, and return.
-- **Tribute to early Civilization.** Fog of war, turn-based movement, fortification building, and terrain-based strategy are deliberate homages to that design tradition.
+- **Tribute to early Civilization.** Fog of war, turn-based movement, fort building, and terrain-based strategy are deliberate homages to that design tradition.
 - **Authentic nautical character.** Use sailing terminology wherever it applies — points of sail, in irons, windward and leeward, running before the wind. Nautical trivia and accurate sailing mechanics are part of the fun. When a design decision can go either way, prefer the choice that a sailor would recognize.
 
 ---
@@ -62,7 +62,7 @@ The player commands *Resolution*. The AI commands *Accord*.
 
 ### Wind
 
-Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts probabilistically at the start of each turn: 40% chance of no change, 25% each for ±1 step, 4% each for ±2, 1% each for ±3. The shift is derived from a seeded hash of `(seed, turn)` — the same seed always produces the same wind sequence and the sequence is fully recoverable from seed + turn count alone.
+Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts probabilistically at the start of each turn: 20% chance of no change, 30% each for ±1 step, 7% each for ±2, 3% each for ±3. The shift is derived from a seeded hash of `(seed, turn)` — the same seed always produces the same wind sequence and the sequence is fully recoverable from seed + turn count alone.
 
 Both wind and ship heading use the six hex directions, giving exactly four possible relationships — four points of sail. Wind is named by where it comes **from** (windward convention).
 
@@ -112,13 +112,13 @@ Crew are the player's land-based units. All crew are identical in capability.
 **Capabilities:**
 - Navigate land hexes (1 AP per hex)
 - Sail a ship (requires at least 1 crew aboard)
-- Improve a land hex into a wall segment (5 turns; valid on grassland, forest, stone)
+- Improve a land hex into a wall segment (3 turns committed; valid on grassland, forest, stone)
 - Improve grassland into farm (cost TBD; mutually exclusive with wall)
 - Improve forest into logging camp (cost TBD; mutually exclusive with wall)
 - Attack enemy units by moving onto their hex (1 AP; see Combat)
 - Pick up, carry, and hide the player's flag
 - Capture the enemy's flag by moving onto its hex
-- Return captured enemy flag to a friendly fortification (win condition)
+- Return captured enemy flag to a friendly fort (win condition)
 
 **Stacking:** Any number of friendly crew may occupy the same hex. Enemy units may never share a hex.
 
@@ -137,7 +137,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 **Movement budget:** 6 points per turn, always. Cost per hex is determined by the angle to the wind (see Wind section). Running costs 2 pts/hex (3 hexes available), broad reach costs 3 pts/hex (2 hexes), close reach costs 6 pts/hex (1 hex), windward direction is blocked. The End Turn button skips remaining movement.
 
-**Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by fortifications draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool is defined in `src/js/engine/ships.js` when that module is introduced.
+**Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by forts draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool is defined in `src/js/engine/ships.js` when that module is introduced.
 
 **Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
@@ -152,7 +152,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 **Capture:** A ship with 0 crew aboard is capturable. Enemy crew may board it by moving onto its hex (1 AP). Once any enemy crew boards, the ship's owner changes to the boarding faction — it flies a new flag and is now an enemy vessel. This means leaving a ship uncrewed near shore is a strategic risk. Recapture follows the same rule: board an uncrewed enemy ship to re-flag it.
 
-**Production:** A fortification that contains a wall hex adjacent to ocean and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent ocean hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
+**Production:** A fort that contains a wall hex adjacent to ocean and is within 3 hexes of a logging camp produces ships. The ship appears on an adjacent ocean hex. Production requires a fixed number of turns (TBD; initial value: 10 turns).
 
 **Anchor:** A ship may be ordered to anchor (F key). An anchored ship is excluded from the turn queue until the player explicitly clicks it to wake it. Anchored ships do not require turn-passes.
 
@@ -160,9 +160,9 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 ---
 
-## Fortifications
+## Forts
 
-Fortifications are constructed wall segment by wall segment and go live when the wall forms a closed loop.
+Forts are constructed wall segment by wall segment and go live when the wall forms a closed loop.
 
 ### Improvements and Mutual Exclusivity
 
@@ -179,41 +179,44 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 
 ### Construction
 
-1. A crew unit stops on a grassland, forest, or stone hex and spends 5 turns building.
-2. After 5 turns, that hex becomes a **wall** improvement, replacing any prior improvement on that hex.
-3. The crew unit may then move to an adjacent hex and repeat.
-4. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fortification**.
+1. A crew unit stops on a grassland, forest, or stone hex and initiates building (B key). The crew enters **building** status immediately.
+2. Building status locks the crew to that hex for 3 consecutive turns: the turn building begins plus 2 turns in which the crew skips all other actions. The crew cannot move, embark, improve terrain, or perform any other action while building.
+3. After all 3 turns complete, the hex becomes a **wall** improvement. No partial wall is visible or usable during construction — WALL_1 and WALL_2 are internal tracking states only; they do not fire cannons, do not contribute to fort-loop detection, and satisfy no wall condition.
+4. If the building crew is destroyed during construction, the work is abandoned. No partial improvement is left on the hex.
+5. Only one crew unit may build on a given hex at a time.
+6. The crew unit may then move to an adjacent hex and repeat.
+7. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fort**.
 
 Mountain hexes participate as natural wall segments without requiring any improvement. The closed-loop detection replaces the prior flood-fill model.
 
 ### Embarkation at Fortified Shore
 
-- **Friendly fortification:** crew may embark and disembark freely across shore-adjacent wall hexes (gates are assumed).
-- **Enemy fortification:** crew may not disembark onto a shore-adjacent enemy wall hex; the fort fires on approaching units.
+- **Friendly fort:** crew may embark and disembark freely across shore-adjacent wall hexes (gates are assumed).
+- **Enemy fort:** crew may not disembark onto a shore-adjacent enemy wall hex; the fort fires on approaching units.
 
-### Two-Tier Fortification Model
+### Two-Tier Fort Model
 
-Fortifications provide value in two distinct tiers:
+Forts provide value in two distinct tiers:
 
 **Tier 1 — Any wall segment**
 A single wall hex, or any chain of wall hexes not yet forming a closed loop, fires cannons automatically at adjacent enemy units at the end of the player's turn. No enclosure required. A lone wall segment on a stone outcrop is immediately tactically useful.
 
-**Tier 2 — Enclosed fortification**
-When wall hexes form a closed loop, the enclosed interior becomes a live fortification, unlocking the full capability set:
+**Tier 2 — Enclosed fort**
+When wall hexes form a closed loop, the enclosed interior becomes a live fort, unlocking the full capability set:
 
 | Capability | Condition |
 |---|---|
 | Fire cannons (auto) | End of player turn; all wall segments fire at adjacent enemies |
 | Generate crew | Farm within 3 hexes |
 | Generate ships | Logging camp within 3 hexes AND a shore-adjacent wall hex exists |
-| Accept captured flag (win) | Carrier enters any friendly enclosed fortification |
+| Accept captured flag (win) | Carrier enters any friendly enclosed fort |
 | Store hidden flag | Owner places flag in any friendly wall hex or interior |
 
 When a ship is generated, it appears on an adjacent coast hex.
 
 ### Wall Segment Hit Points
 
-Wall segments are destructible. Ships and crew may attack wall segments (1 AP; range 1 hex). Stone wall segments have more HP than grassland or forest wall segments. When a wall segment's HP reaches 0 it is destroyed, opening a gap in the wall. If the gap breaks the closed loop, the fortification loses its Tier 2 status until the gap is repaired.
+Wall segments are destructible. Ships and crew may attack wall segments (1 AP; range 1 hex). Stone wall segments have more HP than grassland or forest wall segments. When a wall segment's HP reaches 0 it is destroyed, opening a gap in the wall. If the gap breaks the closed loop, the fort loses its Tier 2 status until the gap is repaired.
 
 | Wall type | Relative durability |
 |---|---|
@@ -223,7 +226,7 @@ Wall segments are destructible. Ships and crew may attack wall segments (1 AP; r
 
 ### Stone Wall Bonus
 
-Stone wall segments have higher HP than other wall types and increase the fortification's resistance to cannon damage. The bonus comes from the material — only stone wall hexes confer it.
+Stone wall segments have higher HP than other wall types and increase the fort's resistance to cannon damage. The bonus comes from the material — only stone wall hexes confer it.
 
 ---
 
@@ -243,7 +246,7 @@ Each player has one flag. Flags are the central objective of the game.
 
 **At game start:** Both flags begin in the `carried` state, held by a designated crew unit aboard each player's starting ship.
 
-**Hiding a flag:** The carrying crew unit must be on a land hex. Hiding costs 1 AP. The flag transitions to `hidden` on that hex. Valid hide locations: any land hex the player can place a unit on — including friendly wall segments and fortification interiors. Excludes enemy-controlled hexes (enemy wall segments and their interiors).
+**Hiding a flag:** The carrying crew unit must be on a land hex. Hiding costs 1 AP. The flag transitions to `hidden` on that hex. Valid hide locations: any land hex the player can place a unit on — including friendly wall segments and fort interiors. Excludes enemy-controlled hexes (enemy wall segments and their interiors).
 
 **Re-hiding a flag:** The owning player may pick up their hidden flag (1 turn action, unit must be adjacent) and hide it elsewhere.
 
@@ -255,7 +258,7 @@ Each player has one flag. Flags are the central objective of the game.
 1. The AI captures the player's flag and reunites it with its own flag.
 2. The player's crew unit carrying the captured enemy flag is destroyed — **immediate loss** (the captured flag is forfeit).
 
-The second loss condition creates maximum tension during the return journey. The design consequence of the new win condition: the player's flag hiding location becomes the destination for the return trip, not an arbitrary fortification. Choosing a hiding spot that is both defensible and reachable becomes a meaningful strategic decision.
+The second loss condition creates maximum tension during the return journey. The design consequence of the new win condition: the player's flag hiding location becomes the destination for the return trip, not an arbitrary fort. Choosing a hiding spot that is both defensible and reachable becomes a meaningful strategic decision.
 
 ---
 
@@ -273,12 +276,12 @@ The initial AI is intentionally simple. Sophistication will increase in later it
 
 **Phase 2 — Expansion:**
 - AI allocates crew and ships on a fixed turn schedule (TBD).
-- AI builds fortifications near favorable terrain (stone, coast, grassland, forest).
+- AI builds walls near favorable terrain (stone, coast, grassland, forest).
 - AI moves ships to explore the map.
 
 **Phase 3 — Aggression:**
 - AI seeks out visible player ships and fires cannons.
-- AI seeks out visible player fortifications.
+- AI seeks out visible player forts.
 - Once the AI has explored the hex containing the player's flag, AI crew move toward it.
 
 **AI flag hiding:** The AI hides its flag during Phase 1, mirroring the player experience. The AI flag location is unknown to the player until discovered by exploration.
@@ -346,8 +349,8 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 
 | Condition | Result |
 |---|---|
-| Player's crew delivers captured AI flag to a player fortification | Player wins |
-| AI's crew delivers captured player flag to an AI fortification | Player loses |
+| Player's crew delivers captured AI flag to a player fort | Player wins |
+| AI's crew delivers captured player flag to an AI fort | Player loses |
 | Player's crew carrying enemy flag is destroyed | Player loses immediately |
 
 ---
@@ -359,7 +362,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-18 | Hex grid (not square grid) | More organic terrain, equidistant neighbors, better for nautical theme |
 | 2026-04-18 | All crew identical | Keeps rules simple and abstract; complexity from terrain and positioning |
 | 2026-04-18 | All ships identical until destroyed | Reduces tracking burden; strategic value from positioning, not unit type |
-| 2026-04-18 | Fortification via enclosure | More interesting than placement; rewards reading natural terrain shapes |
+| 2026-04-18 | Fort via enclosure | More interesting than placement; rewards reading natural terrain shapes |
 | 2026-04-18 | Flag carrier death = immediate loss | Creates high-stakes escort mechanic on return journey |
 | 2026-04-18 | Save to JSON file download | No backend required; works on any static host |
 | 2026-04-18 | AI mirrors player starting conditions | Makes AI feel like a true opponent; enables symmetric gameplay |
@@ -367,13 +370,13 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-18 | Collapsed "plains" and "farmland" into "grassland" | Simpler and more consistent — Forest→Logging Camp and Grassland→Farm follow the same pattern; separate "farmland" type was redundant |
 | 2026-04-18 | Elevation discarded after terrain classification | A 2D hex grid cannot meaningfully depict inter-hex elevation differences; terrain type carries all visual and strategic meaning; mountains signal impassable high terrain without runtime elevation data |
 | 2026-04-18 | Wall is a hex improvement, not a placed unit | Consistent with farm/logging camp model; one improvement per hex; stone walls give defensive bonus from the material, not adjacency |
-| 2026-04-18 | Fortification goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
+| 2026-04-18 | Fort goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
 | 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary |
 | 2026-04-18 | Friendly forts allow embarkation at shore-adjacent wall hexes | Gates are assumed; enemy forts fire on approaching units and block disembarkation |
 | 2026-04-19 | Map size 300×200 (60,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
 | 2026-04-19 | Wind system with points of sail (1–3 AP) | Authentic nautical mechanic; creates meaningful directional decisions without simulation complexity |
 | 2026-04-19 | In irons: 1 AP attack-only, no upwind movement | Ships can always return fire; cannot exploit wind to move upwind |
-| 2026-04-19 | Two-tier fortification: wall fires immediately, enclosure unlocks production | Any wall hex is tactically useful; enclosure rewards sustained building effort |
+| 2026-04-19 | Two-tier fort: wall fires immediately, enclosure unlocks production | Any wall hex is tactically useful; enclosure rewards sustained building effort |
 | 2026-04-19 | Attack is implicit movement, no explicit attack command | Simplifies controls; moving onto enemy hex = attack; unified model for all unit types |
 | 2026-04-19 | Cannon range = 1 hex, constant | Simple and consistent; no range tracking required |
 | 2026-04-19 | Crew are 1 HP units; ships and walls are multi-hit | Crew losses feel significant; ships and forts require sustained effort to destroy |
@@ -381,7 +384,10 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-19 | Friendly crew stack freely; ships stack freely; enemies never share a hex | Stacks absorb hits naturally; contact with enemy always triggers combat |
 | 2026-04-19 | Flag hiding: any land hex the player can place a unit on | Excludes enemy-controlled hexes; includes friendly wall segments and interiors |
 | 2026-04-21 | Ships are capturable: boarding an uncrewed ship re-flags it | Creates strategic cost to leaving ships uncrewed near shore; consistent with "attack = movement" model; owner field on ship tracks current faction |
-| 2026-04-22 | Wind shift is probabilistic per-turn, not fixed interval | Feels more like real wind: usually steady, occasionally surprising. Fixed interval felt mechanical and predictable. 90% small/no change, 10% large shift. |
+| 2026-04-22 | Wind shift is probabilistic per-turn, not fixed interval | Feels more like real wind: usually steady, occasionally surprising. Fixed interval felt mechanical and predictable. |
+| 2026-04-26 | Wind shift distribution rebalanced: 20% no-change, 30% each ±1, 7% each ±2, 3% each ±3 | Original 40% no-change caused long still spells punctuated by large jumps. New distribution shifts by ±1 on 60% of turns, giving a steadier drift with occasional larger veers. |
 | 2026-04-22 | Movement budget (6 pts) with per-direction costs, not flat per-turn AP | Flat AP allowed multiple close-reach steps per turn, which should be more expensive than running. Budget model correctly enforces 3 running, 2 broad-reach, or 1 close-reach move per turn, and allows mixed-direction turns. |
 | 2026-04-22 | In irons blocks only windward hex, not all movement | Blocking all movement stranded ships completely. In irons describes a heading relationship, not a turn-long locked state. The ship can always turn and move in non-windward directions. |
 | 2026-04-22 | Ship starts facing downwind | Guarantees 3 running moves at game start. Prevents the poor UX of loading a new game and being immediately in irons. |
+| 2026-04-26 | Wall construction is a committed 3-turn action; no partial completion | Allowing crews to build one stage and walk away makes wall placement feel like a cheap incremental action and breaks the "this hex is or isn't a wall" invariant. The locked-builder model makes construction a meaningful commitment and keeps wall state binary from the game's perspective. |
+| 2026-04-26 | Wall construction time standardized to 3 turns (was 5 in spec, 3 in user docs) | User doc was correct; spec contained an earlier draft value. 3 turns matches the WALL_1/WALL_2/WALL stage count and feels right for early playtesting. |

@@ -33,7 +33,7 @@ All `engine/` modules must have behavioral tests. UI modules are excluded from t
 - Hex grid math: coordinate conversion, neighbor calculation, distance, pathfinding
 - Terrain generation: correct terrain type distribution, flood-fill produces valid land/sea topology
 - Fog of war: state transitions (undiscovered → explored → visible)
-- Fortification enclosure: closed-loop detection correctly identifies when wall segments form a complete ring and marks interior hexes as live
+- Fort enclosure: closed-loop detection correctly identifies when wall segments form a complete ring and marks interior hexes as live
 - Flag state machine: carried → hidden → captured transitions
 - Unit movement: valid moves, illegal moves rejected
 - Turn management: turn order, action point accounting

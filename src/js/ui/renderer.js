@@ -2,6 +2,7 @@
 
 import { UNDISCOVERED, EXPLORED, VISIBLE } from '../engine/fog.js';
 import { neighbor } from '../engine/hex.js';
+import { t } from '../locale/en.js';
 
 const TERRAIN_COLORS = {
   ocean:     '#1a6b8a',
@@ -49,21 +50,23 @@ const DIRECTION_ANGLES = (() => {
 const HEX_HALF_W = HEX_SIZE;
 const HEX_HALF_H = HEX_SIZE * SQRT3 / 2;
 
-let _canvas      = null;
-let _ctx         = null;
-let _terrain     = null;
-let _fog         = null;
-let _ships       = [];
-let _mapWidth    = 0;
-let _mapHeight   = 0;
-let _camera      = { x: 0, y: 0 };
-let _panAnim     = null; // { fromX, fromY, toX, toY, startTime, duration }
-let _stars       = [];
-let _animFrameId = null;
-let _devFogOff    = false;
-let _selection    = null;
-let _validTargets = [];
-let _crew         = [];
+let _canvas        = null;
+let _ctx           = null;
+let _terrain       = null;
+let _fog           = null;
+let _ships         = [];
+let _mapWidth      = 0;
+let _mapHeight     = 0;
+let _camera        = { x: 0, y: 0 };
+let _panAnim       = null; // { fromX, fromY, toX, toY, startTime, duration }
+let _stars         = [];
+let _animFrameId   = null;
+let _devFogOff     = false;
+let _selection     = null;
+let _validTargets  = [];
+let _crew          = [];
+let _improvements  = null; // Uint8Array parallel to terrain — 0=none,1=farm,2=logging,3=wall,4=wall_1,5=wall_2
+let _buildTargetHex = null; // {q,r} of the hex currently highlighted for build mode, or null
 
 function buildStars(w, h) {
   const stars = [];
@@ -88,6 +91,134 @@ function drawHexPath(ctx, corners) {
   ctx.moveTo(corners[0][0], corners[0][1]);
   for (let i = 1; i < 6; i++) ctx.lineTo(corners[i][0], corners[i][1]);
   ctx.closePath();
+}
+
+// Terrain detail icons — sparse, low-contrast overlays drawn after the base hex fill.
+// `seed` is a position-derived integer so adjacent same-type hexes vary slightly.
+
+function drawTerrainOcean(ctx, cx, cy, size, seed) {
+  const s  = size * 0.30;
+  const oy = ((seed * 13 % 5) - 2) * size * 0.06;
+  ctx.save();
+  ctx.translate(cx, cy + oy);
+  ctx.rotate(-10 * Math.PI / 180);
+  ctx.beginPath();
+  ctx.moveTo(-s, 0);
+  ctx.bezierCurveTo(-s * 0.3, -s * 0.55,  s * 0.3, s * 0.55,  s, 0);
+  ctx.strokeStyle = 'rgba(100,185,220,0.50)';
+  ctx.lineWidth   = 0.9;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawTerrainGrassland(ctx, cx, cy, size, seed) {
+  const count = 2 + (seed % 2);
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(-5 * Math.PI / 180);
+  ctx.strokeStyle = 'rgba(185,230,120,0.55)';
+  ctx.lineWidth   = 0.8;
+  for (let i = 0; i < count; i++) {
+    const ox = (i - (count - 1) / 2) * size * 0.24;
+    const by = size * 0.20;
+    const ty = -size * 0.20;
+    ctx.beginPath();
+    ctx.moveTo(ox, by);
+    ctx.lineTo(ox, ty);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(ox,               ty + size * 0.09);
+    ctx.lineTo(ox + size * 0.10, ty - size * 0.07);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTerrainForest(ctx, cx, cy, size, seed) {
+  const s = size * 0.21;
+  ctx.fillStyle = 'rgba(85,155,65,0.60)';
+  ctx.beginPath();
+  ctx.moveTo(cx,            cy - s);
+  ctx.lineTo(cx + s * 0.65, cy + s * 0.55);
+  ctx.lineTo(cx - s * 0.65, cy + s * 0.55);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function drawTerrainStone(ctx, cx, cy, size, seed) {
+  const bw = size * 0.24;
+  const bh = size * 0.13;
+  const g  = size * 0.04;
+  ctx.strokeStyle = 'rgba(190,175,155,0.55)';
+  ctx.lineWidth   = 0.7;
+  ctx.strokeRect(cx - bw - g, cy + g,       bw, bh); // bottom-left brick
+  ctx.strokeRect(cx + g,      cy + g,       bw, bh); // bottom-right brick
+  ctx.strokeRect(cx - bw / 2, cy - bh - g,  bw, bh); // top centered brick
+}
+
+function drawTerrainMountain(ctx, cx, cy, size, seed) {
+  const s = size * 0.28;
+  ctx.strokeStyle = 'rgba(165,148,128,0.60)';
+  ctx.lineWidth   = 0.9;
+
+  // Large background peak — left leg begins where it emerges above the small peak.
+  // The portion below that intersection is hidden behind the foreground triangle.
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 0.51, cy - s * 0.16);
+  ctx.lineTo(cx,             cy - s);
+  ctx.lineTo(cx + s * 0.90, cy + s * 0.50);
+  ctx.stroke();
+
+  // Smaller foreground peak shifted left; right leg cut ~75% down.
+  ctx.beginPath();
+  ctx.moveTo(cx - s * 1.19, cy + s * 0.50);
+  ctx.lineTo(cx - s * 0.65, cy - s * 0.40);
+  ctx.lineTo(cx - s * 0.25, cy + s * 0.28);
+  ctx.stroke();
+}
+
+function drawImprovementFarm(ctx, cx, cy, size) {
+  const s = size * 0.20;
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.rotate(Math.PI / 4);
+  ctx.fillStyle = 'rgba(220,185,40,0.75)';
+  ctx.fillRect(-s, -s, s * 2, s * 2);
+  ctx.restore();
+}
+
+function drawImprovementLogging(ctx, cx, cy, size) {
+  const s = size * 0.22;
+  ctx.strokeStyle = 'rgba(160,100,50,0.80)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(cx - s, cy - s);
+  ctx.lineTo(cx + s, cy + s);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + s, cy - s);
+  ctx.lineTo(cx - s, cy + s);
+  ctx.stroke();
+}
+
+// stage: 1 = base only (under construction), 2 = base + 2 merlons, 3 = complete (3 merlons)
+function drawImprovementWall(ctx, cx, cy, size, stage) {
+  const bw  = size * 0.72;
+  const bh  = size * 0.18;
+  const mw  = size * 0.16;
+  const mh  = size * 0.22;
+  const by  = cy + size * 0.06;
+  const alpha = stage === 1 ? 0.50 : stage === 2 ? 0.62 : 0.78;
+  ctx.fillStyle = `rgba(210,200,185,${alpha})`;
+  ctx.fillRect(cx - bw / 2, by, bw, bh);
+  if (stage < 2) return;
+  const gap = (bw - 3 * mw) / 4;
+  // Stage 2: left and right merlons only; stage 3: all three
+  const slots = stage === 2 ? [0, 2] : [0, 1, 2];
+  for (const i of slots) {
+    const mx = cx - bw / 2 + gap + i * (mw + gap);
+    ctx.fillRect(mx, by - mh, mw, mh);
+  }
 }
 
 // Draw a mast + pennant flag above the ship's hex center
@@ -234,6 +365,22 @@ function drawFrame(timestamp) {
       _ctx.lineWidth = 0.5;
       _ctx.stroke();
 
+      const tseed = (q * 31 + r * 17) | 0;
+      if      (terrain === 'ocean')     drawTerrainOcean(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'grassland') drawTerrainGrassland(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'forest')    drawTerrainForest(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'stone')     drawTerrainStone(_ctx, x, y, HEX_SIZE, tseed);
+      else if (terrain === 'mountain')  drawTerrainMountain(_ctx, x, y, HEX_SIZE, tseed);
+
+      if (_improvements) {
+        const imp = _improvements[r * _mapWidth + q];
+        if      (imp === 1) drawImprovementFarm(_ctx, x, y, HEX_SIZE);
+        else if (imp === 2) drawImprovementLogging(_ctx, x, y, HEX_SIZE);
+        else if (imp === 3) drawImprovementWall(_ctx, x, y, HEX_SIZE, 3);
+        else if (imp === 4) drawImprovementWall(_ctx, x, y, HEX_SIZE, 1);
+        else if (imp === 5) drawImprovementWall(_ctx, x, y, HEX_SIZE, 2);
+      }
+
       if (fogState === EXPLORED) {
         drawHexPath(_ctx, corners);
         _ctx.fillStyle = 'rgba(0,0,0,0.6)';
@@ -252,6 +399,20 @@ function drawFrame(timestamp) {
     _ctx.strokeStyle = 'rgba(232,213,176,0.45)';
     _ctx.lineWidth = 1.5;
     _ctx.stroke();
+  }
+
+  // Build target hex — amber fill + outline
+  if (_buildTargetHex) {
+    const { x, y } = hexToPixel(_buildTargetHex.q, _buildTargetHex.r, _camera);
+    if (x + HEX_HALF_W >= 0 && x - HEX_HALF_W <= w && y + HEX_HALF_H >= 0 && y - HEX_HALF_H <= h) {
+      const corners = hexCorners(x, y, HEX_SIZE);
+      drawHexPath(_ctx, corners);
+      _ctx.fillStyle = 'rgba(220,160,30,0.28)';
+      _ctx.fill();
+      _ctx.strokeStyle = 'rgba(220,160,30,0.85)';
+      _ctx.lineWidth = 2;
+      _ctx.stroke();
+    }
   }
 
   // Ships
@@ -313,7 +474,7 @@ function drawFrame(timestamp) {
   if (_devFogOff) {
     _ctx.font = 'bold 11px monospace';
     _ctx.fillStyle = 'rgba(255,80,80,0.9)';
-    _ctx.fillText('DEV: FOG OFF', 8, 16);
+    _ctx.fillText(t('dev_fog_off'), 8, 16);
   }
 
   _animFrameId = requestAnimationFrame(drawFrame);
@@ -374,6 +535,14 @@ export function updateShips(ships) {
 
 export function updateCrew(crew) {
   _crew = crew;
+}
+
+export function updateImprovements(improvements) {
+  _improvements = improvements;
+}
+
+export function updateBuildTarget(hex) {
+  _buildTargetHex = hex;
 }
 
 export function updateSelection(selection, validTargets) {
