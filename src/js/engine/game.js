@@ -218,11 +218,11 @@ export function unloadCrew(game, shipId) {
 
 function findStartingOceanHex(terrain, width, height, seed) {
   const corner  = seed % 4;
-  const qLeft   = corner === 1 || corner === 3;
+  const qRight  = corner === 1 || corner === 3;
   const rBottom = corner === 2 || corner === 3;
 
-  const qMin = qLeft   ? Math.floor(width  * 3 / 4) : START_EDGE_MARGIN;
-  const qMax = qLeft   ? width  - START_EDGE_MARGIN  : Math.floor(width  / 4);
+  const qMin = qRight  ? Math.floor(width  * 3 / 4) : START_EDGE_MARGIN;
+  const qMax = qRight  ? width  - START_EDGE_MARGIN  : Math.floor(width  / 4);
   const rMin = rBottom ? Math.floor(height * 3 / 4) : START_EDGE_MARGIN;
   const rMax = rBottom ? height - START_EDGE_MARGIN  : Math.floor(height / 4);
 

@@ -3,7 +3,7 @@
 import { generateTerrain } from './engine/terrain.js';
 import { MAP_WIDTH, MAP_HEIGHT, neighbors, inBounds, hexToIndex } from './engine/hex.js';
 import { initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn, improveTerrain, unloadCrew, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_WALL_1, IMPROVEMENT_WALL_2, IMPROVEMENT_NONE } from './engine/game.js';
-import { t } from './locale/en.js';
+import { t, WIND_NAMES, SAIL_NAMES } from './locale/en.js';
 import { pointOfSail, moveApCost } from './engine/wind.js';
 import * as renderer from './ui/renderer.js';
 
@@ -18,13 +18,9 @@ const elMessageArea = document.getElementById('message-area');
 const elWindWrapper = document.getElementById('wind-face-wrapper');
 const elWindLabel   = document.getElementById('wind-label');
 
-// Named for where wind comes FROM (standard convention).
-// wind.dir is the leeward index, so the windward source is (dir+3)%6.
-const WIND_NAMES     = ['SW', 'NW', 'N', 'NE', 'SE', 'S'];
-// Rotate the face so its plumes point toward the leeward direction (where wind goes).
+// Rotate the wind face so its plumes point toward the leeward direction (where wind goes).
 // windhead.png points DOWN (south) at 0° — 90° offset vs. the old right-pointing SVG.
 const WIND_CSS_ANGLE = [240, 300, 0, 60, 120, 180];
-const SAIL_NAMES     = ['In irons', 'Close reach', 'Broad reach', 'Running'];
 
 let game     = null;
 let terrain  = null;
@@ -469,7 +465,7 @@ function setStatus(msg) {
   if (!elStatusInfo) return;
   elStatusInfo.innerHTML = msg
     ? `<p>${msg}</p>`
-    : '<p class="placeholder-text">Start a new game to begin.</p>';
+    : `<p class="placeholder-text">${t('placeholder_start_game')}</p>`;
 }
 
 function cancelAutoEnd() {
@@ -483,7 +479,7 @@ function cancelAdvance() {
 
 function maybeAutoEndTurn() {
   if (pendingUnits.length > 0 || _autoEndTimer) return;
-  setStatus('All moves spent…');
+  setStatus(t('msg_all_moves_spent'));
   _autoEndTimer = setTimeout(() => {
     _autoEndTimer = null;
     if (!game || pendingUnits.length > 0) { setStatus(''); return; }
@@ -507,14 +503,14 @@ function syncRenderer() {
 function updateWindDisplay() {
   if (!game) return;
   if (elWindWrapper) elWindWrapper.style.transform = `rotate(${WIND_CSS_ANGLE[game.wind.dir]}deg)`;
-  if (elWindLabel)   elWindLabel.textContent = `${WIND_NAMES[game.wind.dir]} wind`;
+  if (elWindLabel)   elWindLabel.textContent = t('wind_label', { name: WIND_NAMES[game.wind.dir] });
 }
 
 function updatePanel() {
   if (elTurnNum) elTurnNum.textContent = game ? game.turn : '—';
   if (!elUnitInfo) return;
   if (!game || !selection) {
-    elUnitInfo.innerHTML = '<p class="placeholder-text">No unit selected.</p>';
+    elUnitInfo.innerHTML = `<p class="placeholder-text">${t('placeholder_no_unit')}</p>`;
     return;
   }
   if (selection.type === 'ship') {
@@ -524,7 +520,7 @@ function updatePanel() {
     const pos      = pointOfSail(game.wind.dir, ship.direction);
     const sailName = SAIL_NAMES[pos];
     if (ship.sleeping) {
-      elUnitInfo.innerHTML = `<p><strong>Resolution</strong></p><p>Anchored</p>`;
+      elUnitInfo.innerHTML = `<p><strong>${t('ship_name_resolution')}</strong></p><p>${t('ship_status_anchored')}</p>`;
     } else {
       const hasAdjLand = neighbors(ship.q, ship.r).some(([nq, nr]) => {
         if (!inBounds(nq, nr, MAP_WIDTH, MAP_HEIGHT)) return false;
@@ -532,11 +528,11 @@ function updatePanel() {
         return ttype !== 'ocean' && ttype !== 'mountain';
       });
       const hasSleepingCrew = game.crew.some(c => c.aboard && c.shipId === ship.id && c.sleeping);
-      const unloadHint = (hasAdjLand && hasSleepingCrew) ? `<p>U — Unload crew</p>` : '';
-      elUnitInfo.innerHTML = `<p><strong>Resolution</strong></p>` +
-        `<p>Crew: ${aboard} / ${game.crew.length}</p>` +
-        `<p>Wind: ${WIND_NAMES[game.wind.dir]}</p>` +
-        `<p>${sailName} — ${Math.floor(ship.ap / 2)} AP</p>` +
+      const unloadHint = (hasAdjLand && hasSleepingCrew) ? `<p>${t('ship_hint_unload')}</p>` : '';
+      elUnitInfo.innerHTML = `<p><strong>${t('ship_name_resolution')}</strong></p>` +
+        `<p>${t('ship_crew_count', { aboard, total: game.crew.length })}</p>` +
+        `<p>${t('ship_wind_reading', { name: WIND_NAMES[game.wind.dir] })}</p>` +
+        `<p>${t('ship_sail_ap', { sail: sailName, ap: Math.floor(ship.ap / 2) })}</p>` +
         unloadHint;
     }
     return;
@@ -547,17 +543,17 @@ function updatePanel() {
       if (buildMode) {
         const avail  = availableImprovements(c);
         const cur    = game.improvements[hexToIndex(c.q, c.r, MAP_WIDTH)];
-        const wallLabel = cur === IMPROVEMENT_WALL_1 ? 'Wall (2/3)' :
-                          cur === IMPROVEMENT_WALL_2 ? 'Wall (3/3)' : 'Wall (1/3)';
-        const labels = { [IMPROVEMENT_FARM]: 'Farm', [IMPROVEMENT_LOGGING]: 'Logging Camp', [IMPROVEMENT_WALL]: wallLabel };
+        const wallLabel = cur === IMPROVEMENT_WALL_1 ? t('improvement_wall_stage_2') :
+                          cur === IMPROVEMENT_WALL_2 ? t('improvement_wall_stage_3') : t('improvement_wall_stage_1');
+        const labels = { [IMPROVEMENT_FARM]: t('improvement_farm'), [IMPROVEMENT_LOGGING]: t('improvement_logging_camp'), [IMPROVEMENT_WALL]: wallLabel };
         const opts   = avail.map((imp, i) => `<p>${i + 1} — ${labels[imp]}</p>`).join('');
-        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>Build:</p>${opts}<p>Esc — Cancel</p>`;
+        elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_build_label')}</p>${opts}<p>${t('crew_build_cancel')}</p>`;
       } else if (c.sleeping) {
-        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>Encamped</p>`;
+        elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_status_encamped')}</p>`;
       } else {
         const avail     = availableImprovements(c);
-        const buildHint = avail.length > 0 ? `<p>B — Build</p>` : '';
-        elUnitInfo.innerHTML = `<p><strong>Crew ${c.id + 1}</strong></p><p>AP: ${c.ap} / 1</p>${buildHint}`;
+        const buildHint = avail.length > 0 ? `<p>${t('crew_hint_build')}</p>` : '';
+        elUnitInfo.innerHTML = `<p><strong>${t('crew_name', { n: c.id + 1 })}</strong></p><p>${t('crew_ap', { ap: c.ap })}</p>${buildHint}`;
       }
     }
   }

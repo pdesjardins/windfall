@@ -84,6 +84,10 @@ Windfall is localization-ready. All user-visible strings are externalized to loc
 - The active locale is loaded once at initialization and passed to UI modules.
 - CI will lint for raw string literals in `src/js/ui/` files.
 
+**Adding or changing any user-visible text — including labels, hints, status messages, unit names, and developer overlays — requires updating `src/js/locale/en.js` first.** Do not write the string inline and plan to move it later. The locale file is the only place strings are written; the UI only calls `t()`. This applies to `main.js` and all files under `src/js/ui/`.
+
+When a string includes dynamic values (counts, names, directions), use `{var}` placeholders in the locale entry and pass a vars object to `t(key, { var: value })`. Do not build the string by concatenation in the UI code — concatenation breaks translation of languages with different word order.
+
 **RTL layout support:** All CSS must use logical properties rather than physical directional properties:
 
 | Do not use | Use instead |

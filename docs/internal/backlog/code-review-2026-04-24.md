@@ -98,6 +98,16 @@ The 3-turn count is: the turn the crew initiates building + 2 subsequent turns s
 
 ---
 
+### 9. Fort detection not implemented — walls never go live
+
+The engine has no closed-loop detection. After each wall placement, `improveTerrain` sets `IMPROVEMENT_WALL` but never checks whether the new segment completes a ring. No interior hexes are ever marked as a live fort. The renderer has no fort interior state to draw. From the player's perspective, walls are inert tiles with no feedback that an enclosure is complete.
+
+**Symptoms:** A player who fully encircles a hex with wall segments sees no change — no visual distinction, no cannon fire, no production capability unlocked. There is no way to know whether a fort is live.
+
+**Fix:** Implement closed-loop detection in the engine (after each wall placement, flood-fill or graph-walk to detect whether wall + mountain hexes form a closed ring; mark enclosed hexes as fort interior in a separate `forts` array or bitmask). Add a fort interior rendering pass in `renderer.js` (distinct fill or overlay). Update the info panel to indicate when a selected wall hex is part of a live fort. This is a substantial feature — it warrants its own execution plan.
+
+---
+
 ## Not Fixing (for the record)
 
 - **`shipMoveTargets` doesn't check `sleeping`** — sleeping crew can still pilot the ship. This is a design decision: crew are resting *aboard*, not operating independently. Only disembark requires an awake crew.

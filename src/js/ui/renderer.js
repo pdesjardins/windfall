@@ -2,6 +2,7 @@
 
 import { UNDISCOVERED, EXPLORED, VISIBLE } from '../engine/fog.js';
 import { neighbor } from '../engine/hex.js';
+import { t } from '../locale/en.js';
 
 const TERRAIN_COLORS = {
   ocean:     '#1a6b8a',
@@ -473,7 +474,7 @@ function drawFrame(timestamp) {
   if (_devFogOff) {
     _ctx.font = 'bold 11px monospace';
     _ctx.fillStyle = 'rgba(255,80,80,0.9)';
-    _ctx.fillText('DEV: FOG OFF', 8, 16);
+    _ctx.fillText(t('dev_fog_off'), 8, 16);
   }
 
   _animFrameId = requestAnimationFrame(drawFrame);
