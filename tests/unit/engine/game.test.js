@@ -2,7 +2,7 @@
 
 import {
   initGame, moveShip, disembarkCrew, embarkCrew, moveCrew, endPlayerTurn,
-  improveTerrain, startWallConstruction, unloadCrew,
+  improveTerrain, startWallConstruction, unloadCrew, detectForts,
   IMPROVEMENT_NONE, IMPROVEMENT_FARM, IMPROVEMENT_LOGGING, IMPROVEMENT_WALL, IMPROVEMENT_WALL_1, IMPROVEMENT_WALL_2,
   CREW_AP, CREW_COUNT, SHIP_SIGHT_RANGE,
 } from '../../../src/js/engine/game.js';
@@ -89,7 +89,7 @@ export function runTests(assert) {
       assert('moveShip does not immediately dim old visible area',
         game2.fog[hexToIndex(behindQ, behindR, MAP_WIDTH)] === VISIBLE);
 
-      endPlayerTurn(game2, MAP_WIDTH, MAP_HEIGHT);
+      endPlayerTurn(game2, terrain, MAP_WIDTH, MAP_HEIGHT);
       assert('endPlayerTurn transitions out-of-range hex to EXPLORED',
         game2.fog[hexToIndex(behindQ, behindR, MAP_WIDTH)] === EXPLORED);
     } else {
@@ -239,7 +239,7 @@ export function runTests(assert) {
   game9.ships[0].ap   = 0;
   // Wake one crew member to verify endPlayerTurn puts them back to sleep.
   game9.crew[0].sleeping = false;
-  endPlayerTurn(game9, MAP_WIDTH, MAP_HEIGHT);
+  endPlayerTurn(game9, terrain, MAP_WIDTH, MAP_HEIGHT);
   assert('endPlayerTurn increments turn counter', game9.turn === 2);
   assert('endPlayerTurn resets all crew AP', game9.crew.every(c => c.ap === CREW_AP));
   assert('endPlayerTurn resets ship AP to full move budget',
@@ -370,7 +370,7 @@ export function runTests(assert) {
     assert('building crew AP is consumed',
       wGame.crew[0].ap === 0);
 
-    endPlayerTurn(wGame, MAP_WIDTH, MAP_HEIGHT);
+    endPlayerTurn(wGame, terrain, MAP_WIDTH, MAP_HEIGHT);
     assert('after 1 endPlayerTurn: WALL_2',
       wGame.improvements[hexToIndex(stoneHex.q, stoneHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_2);
     assert('after 1 endPlayerTurn: still building',
@@ -378,7 +378,7 @@ export function runTests(assert) {
     assert('after 1 endPlayerTurn: AP stays 0',
       wGame.crew[0].ap === 0);
 
-    endPlayerTurn(wGame, MAP_WIDTH, MAP_HEIGHT);
+    endPlayerTurn(wGame, terrain, MAP_WIDTH, MAP_HEIGHT);
     assert('after 2 endPlayerTurns: WALL complete',
       wGame.improvements[hexToIndex(stoneHex.q, stoneHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL);
     assert('after 2 endPlayerTurns: building = false',
@@ -447,6 +447,84 @@ export function runTests(assert) {
       startWallConstruction(wfGame, 0, terrain, MAP_WIDTH, MAP_HEIGHT) !== null);
     assert('startWallConstruction sets WALL_1 on forest',
       wfGame.improvements[hexToIndex(forestHex.q, forestHex.r, MAP_WIDTH)] === IMPROVEMENT_WALL_1);
+  }
+
+  // detectForts — synthetic 7×7 all-grassland maps, small enough to reason about directly
+  {
+    const FW = 7, FH = 7;
+    const ftTerrain = new Array(FW * FH).fill('grassland');
+
+    function makeFortGame() {
+      return { improvements: new Uint8Array(FW * FH), liveWalls: new Uint8Array(FW * FH) };
+    }
+
+    // Enclosed ring: 6 walls around (3,3) → all live, center not live
+    {
+      const fg       = makeFortGame();
+      const ringHexes = neighbors(3, 3).filter(([nq, nr]) => inBounds(nq, nr, FW, FH));
+      for (const [nq, nr] of ringHexes) fg.improvements[hexToIndex(nq, nr, FW)] = IMPROVEMENT_WALL;
+      detectForts(fg, ftTerrain, FW, FH);
+      assert('detectForts: enclosed ring — all boundary walls live',
+        ringHexes.every(([nq, nr]) => fg.liveWalls[hexToIndex(nq, nr, FW)] === 1));
+      assert('detectForts: enclosed ring — center (not a wall) not live',
+        fg.liveWalls[hexToIndex(3, 3, FW)] === 0);
+    }
+
+    // Spur: extra wall touching the live ring but not bordering the interior → also live
+    {
+      const fg       = makeFortGame();
+      const ringHexes = neighbors(3, 3).filter(([nq, nr]) => inBounds(nq, nr, FW, FH));
+      for (const [nq, nr] of ringHexes) fg.improvements[hexToIndex(nq, nr, FW)] = IMPROVEMENT_WALL;
+      let spurHex = null;
+      for (const [wq, wr] of ringHexes) {
+        for (const [nq, nr] of neighbors(wq, wr)) {
+          if (!inBounds(nq, nr, FW, FH)) continue;
+          if (fg.improvements[hexToIndex(nq, nr, FW)] === IMPROVEMENT_WALL) continue;
+          if (nq === 3 && nr === 3) continue;
+          spurHex = [nq, nr];
+          break;
+        }
+        if (spurHex) break;
+      }
+      if (spurHex) {
+        fg.improvements[hexToIndex(spurHex[0], spurHex[1], FW)] = IMPROVEMENT_WALL;
+        detectForts(fg, ftTerrain, FW, FH);
+        assert('detectForts: spur connected to live ring is live',
+          fg.liveWalls[hexToIndex(spurHex[0], spurHex[1], FW)] === 1);
+      }
+    }
+
+    // Mountain-only enclosure → no live walls
+    {
+      const mtTerrain = new Array(FW * FH).fill('grassland');
+      for (const [nq, nr] of neighbors(3, 3)) {
+        if (inBounds(nq, nr, FW, FH)) mtTerrain[hexToIndex(nq, nr, FW)] = 'mountain';
+      }
+      const fg = makeFortGame();
+      detectForts(fg, mtTerrain, FW, FH);
+      assert('detectForts: mountain-only enclosure — no live walls',
+        fg.liveWalls.every(v => v === 0));
+    }
+
+    // Isolated wall with no enclosure → not live
+    {
+      const fg = makeFortGame();
+      fg.improvements[hexToIndex(3, 3, FW)] = IMPROVEMENT_WALL;
+      detectForts(fg, ftTerrain, FW, FH);
+      assert('detectForts: isolated wall not live',
+        fg.liveWalls[hexToIndex(3, 3, FW)] === 0);
+    }
+
+    // WALL_1 perimeter does not block the BFS → center is exterior → no fort
+    {
+      const fg = makeFortGame();
+      for (const [nq, nr] of neighbors(3, 3)) {
+        if (inBounds(nq, nr, FW, FH)) fg.improvements[hexToIndex(nq, nr, FW)] = IMPROVEMENT_WALL_1;
+      }
+      detectForts(fg, ftTerrain, FW, FH);
+      assert('detectForts: WALL_1 perimeter does not produce a live fort',
+        fg.liveWalls.every(v => v === 0));
+    }
   }
 
   // Wind integration

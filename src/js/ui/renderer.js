@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { UNDISCOVERED, EXPLORED, VISIBLE } from '../engine/fog.js';
-import { neighbor } from '../engine/hex.js';
+import { neighbor, neighbors, inBounds } from '../engine/hex.js';
 import { t } from '../locale/en.js';
 
 const TERRAIN_COLORS = {
@@ -65,7 +65,8 @@ let _devFogOff     = false;
 let _selection     = null;
 let _validTargets  = [];
 let _crew          = [];
-let _improvements  = null; // Uint8Array parallel to terrain — 0=none,1=farm,2=logging,3=wall,4=wall_1,5=wall_2
+let _improvements   = null; // Uint8Array parallel to terrain — 0=none,1=farm,2=logging,3=wall,4=wall_1,5=wall_2
+let _liveWalls      = null; // Uint8Array parallel to terrain — 1 = wall is part of a live fort
 let _buildTargetHex = null; // {q,r} of the hex currently highlighted for build mode, or null
 
 function buildStars(w, h) {
@@ -266,6 +267,46 @@ function drawShipMarker(ctx, cx, cy, directionIndex, color) {
   ctx.stroke();
 }
 
+function drawFortLines(w, h) {
+  if (!_liveWalls) return;
+  _ctx.save();
+  _ctx.strokeStyle = 'rgba(255,240,200,0.80)';
+  _ctx.lineWidth   = 1.5;
+  _ctx.lineCap     = 'round';
+
+  for (let r = 0; r < _mapHeight; r++) {
+    for (let q = 0; q < _mapWidth; q++) {
+      const idx = r * _mapWidth + q;
+      if (!_liveWalls[idx]) continue;
+
+      const fogState = _devFogOff ? VISIBLE : (_fog ? _fog[idx] : VISIBLE);
+      if (fogState === UNDISCOVERED) continue;
+
+      const { x, y } = hexToPixel(q, r, _camera);
+      if (x + HEX_HALF_W < 0 || x - HEX_HALF_W > w) continue;
+      if (y + HEX_HALF_H < 0 || y - HEX_HALF_H > h) continue;
+
+      for (const [nq, nr] of neighbors(q, r)) {
+        if (!inBounds(nq, nr, _mapWidth, _mapHeight)) continue;
+        const nidx = nr * _mapWidth + nq;
+        if (nidx <= idx) continue; // draw each line once
+        if (!_liveWalls[nidx]) continue;
+
+        const nfogState = _devFogOff ? VISIBLE : (_fog ? _fog[nidx] : VISIBLE);
+        if (nfogState === UNDISCOVERED) continue;
+
+        const { x: nx, y: ny } = hexToPixel(nq, nr, _camera);
+        _ctx.beginPath();
+        _ctx.moveTo(x, y);
+        _ctx.lineTo(nx, ny);
+        _ctx.stroke();
+      }
+    }
+  }
+
+  _ctx.restore();
+}
+
 function drawFrame(timestamp) {
   if (!_ctx) return;
 
@@ -388,6 +429,9 @@ function drawFrame(timestamp) {
       }
     }
   }
+
+  // Fort perimeter lines — live wall segments connected to an enclosed ring
+  drawFortLines(w, h);
 
   // Valid move target highlights
   for (const tgt of _validTargets) {
@@ -539,6 +583,10 @@ export function updateCrew(crew) {
 
 export function updateImprovements(improvements) {
   _improvements = improvements;
+}
+
+export function updateLiveWalls(liveWalls) {
+  _liveWalls = liveWalls;
 }
 
 export function updateBuildTarget(hex) {
