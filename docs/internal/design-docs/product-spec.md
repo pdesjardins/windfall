@@ -62,7 +62,7 @@ The player commands *Resolution*. The AI commands *Accord*.
 
 ### Wind
 
-Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts probabilistically at the start of each turn: 40% chance of no change, 25% each for ±1 step, 4% each for ±2, 1% each for ±3. The shift is derived from a seeded hash of `(seed, turn)` — the same seed always produces the same wind sequence and the sequence is fully recoverable from seed + turn count alone.
+Wind is a global property of the map. Each turn, wind blows in one of the six hex directions. Wind direction shifts probabilistically at the start of each turn: 20% chance of no change, 30% each for ±1 step, 7% each for ±2, 3% each for ±3. The shift is derived from a seeded hash of `(seed, turn)` — the same seed always produces the same wind sequence and the sequence is fully recoverable from seed + turn count alone.
 
 Both wind and ship heading use the six hex directions, giving exactly four possible relationships — four points of sail. Wind is named by where it comes **from** (windward convention).
 
@@ -384,7 +384,8 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-19 | Friendly crew stack freely; ships stack freely; enemies never share a hex | Stacks absorb hits naturally; contact with enemy always triggers combat |
 | 2026-04-19 | Flag hiding: any land hex the player can place a unit on | Excludes enemy-controlled hexes; includes friendly wall segments and interiors |
 | 2026-04-21 | Ships are capturable: boarding an uncrewed ship re-flags it | Creates strategic cost to leaving ships uncrewed near shore; consistent with "attack = movement" model; owner field on ship tracks current faction |
-| 2026-04-22 | Wind shift is probabilistic per-turn, not fixed interval | Feels more like real wind: usually steady, occasionally surprising. Fixed interval felt mechanical and predictable. 90% small/no change, 10% large shift. |
+| 2026-04-22 | Wind shift is probabilistic per-turn, not fixed interval | Feels more like real wind: usually steady, occasionally surprising. Fixed interval felt mechanical and predictable. |
+| 2026-04-26 | Wind shift distribution rebalanced: 20% no-change, 30% each ±1, 7% each ±2, 3% each ±3 | Original 40% no-change caused long still spells punctuated by large jumps. New distribution shifts by ±1 on 60% of turns, giving a steadier drift with occasional larger veers. |
 | 2026-04-22 | Movement budget (6 pts) with per-direction costs, not flat per-turn AP | Flat AP allowed multiple close-reach steps per turn, which should be more expensive than running. Budget model correctly enforces 3 running, 2 broad-reach, or 1 close-reach move per turn, and allows mixed-direction turns. |
 | 2026-04-22 | In irons blocks only windward hex, not all movement | Blocking all movement stranded ships completely. In irons describes a heading relationship, not a turn-long locked state. The ship can always turn and move in non-windward directions. |
 | 2026-04-22 | Ship starts facing downwind | Guarantees 3 running moves at game start. Prevents the poor UX of loading a new game and being immediately in irons. |

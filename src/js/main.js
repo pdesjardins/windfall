@@ -534,7 +534,7 @@ function updatePanel() {
       const hasSleepingCrew = game.crew.some(c => c.aboard && c.shipId === ship.id && c.sleeping);
       const unloadHint = (hasAdjLand && hasSleepingCrew) ? `<p>${t('ship_hint_unload')}</p>` : '';
       elUnitInfo.innerHTML = `<p><strong>${t('ship_name_resolution')}</strong></p>` +
-        `<p>${t('ship_crew_count', { aboard, total: game.crew.length })}</p>` +
+        `<p>${t('ship_crew_count', { aboard })}</p>` +
         `<p>${t('ship_wind_reading', { name: WIND_NAMES[game.wind.dir] })}</p>` +
         `<p>${t('ship_sail_ap', { sail: sailName, ap: Math.floor(ship.ap / 2) })}</p>` +
         unloadHint;

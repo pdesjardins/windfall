@@ -19,7 +19,7 @@ const strings = {
   // Ship panel
   ship_name_resolution:     'Resolution',
   ship_status_anchored:     'Anchored',
-  ship_crew_count:          'Crew: {aboard} / {total}',
+  ship_crew_count:          'Crew aboard: {aboard}',
   ship_wind_reading:        'Wind: {name}',
   ship_sail_ap:             '{sail} — {ap} AP',
   ship_hint_unload:         'U — Unload crew',
