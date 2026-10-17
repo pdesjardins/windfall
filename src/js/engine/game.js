@@ -44,8 +44,9 @@ export function initGame(seed, terrain, width, height) {
   setVisible(fog, q, r, SHIP_SIGHT_RANGE, width, height);
 
   const improvements = new Uint8Array(width * height); // all IMPROVEMENT_NONE (0)
+  const liveWalls    = new Uint8Array(width * height); // 0 = not live, 1 = live
 
-  return { seed, turn: 1, ships: [startShip], nextShipId: 1, crew, fog, wind: { dir: windDir }, improvements };
+  return { seed, turn: 1, ships: [startShip], nextShipId: 1, crew, fog, wind: { dir: windDir }, improvements, liveWalls };
 }
 
 // Improve the hex a crew member is standing on. Costs 1 crew AP.
@@ -199,8 +200,116 @@ export function moveCrew(game, crewId, targetQ, targetR, terrain, width, height)
   return game;
 }
 
+// Detect live forts: runs an outside-in BFS to find land enclosed by complete walls + mountains,
+// then marks all walls connected to a valid enclosure as live in game.liveWalls.
+export function detectForts(game, terrain, width, height) {
+  const liveWalls = game.liveWalls;
+  liveWalls.fill(0);
+
+  // Step 1: outside-in BFS — seeds from ocean hexes and map-boundary open hexes.
+  // Only complete walls and mountains block the fill.
+  const exterior = new Uint8Array(width * height);
+  const queue    = [];
+
+  for (let r = 0; r < height; r++) {
+    for (let q = 0; q < width; q++) {
+      const idx = hexToIndex(q, r, width);
+      if (game.improvements[idx] === IMPROVEMENT_WALL) continue;
+      if (terrain[idx] === 'mountain') continue;
+      if (terrain[idx] === 'ocean' || q === 0 || q === width - 1 || r === 0 || r === height - 1) {
+        exterior[idx] = 1;
+        queue.push(idx);
+      }
+    }
+  }
+
+  let head = 0;
+  while (head < queue.length) {
+    const idx = queue[head++];
+    const q   = idx % width;
+    const r   = (idx / width) | 0;
+    for (const [nq, nr] of neighbors(q, r)) {
+      if (!inBounds(nq, nr, width, height)) continue;
+      const nidx = hexToIndex(nq, nr, width);
+      if (exterior[nidx]) continue;
+      if (game.improvements[nidx] === IMPROVEMENT_WALL) continue;
+      if (terrain[nidx] === 'mountain') continue;
+      exterior[nidx] = 1;
+      queue.push(nidx);
+    }
+  }
+
+  // Step 2: find connected enclosed regions (non-exterior, non-wall, non-mountain land hexes).
+  const visited = new Uint8Array(width * height);
+
+  for (let r = 0; r < height; r++) {
+    for (let q = 0; q < width; q++) {
+      const idx = hexToIndex(q, r, width);
+      if (exterior[idx] || visited[idx]) continue;
+      if (game.improvements[idx] === IMPROVEMENT_WALL) continue;
+      if (terrain[idx] === 'mountain') continue;
+
+      // BFS to collect this enclosed region
+      const region = [idx];
+      visited[idx]  = 1;
+      let rHead     = 0;
+      while (rHead < region.length) {
+        const cidx = region[rHead++];
+        const cq   = cidx % width;
+        const cr   = (cidx / width) | 0;
+        for (const [nq, nr] of neighbors(cq, cr)) {
+          if (!inBounds(nq, nr, width, height)) continue;
+          const nidx = hexToIndex(nq, nr, width);
+          if (visited[nidx] || exterior[nidx]) continue;
+          if (game.improvements[nidx] === IMPROVEMENT_WALL) continue;
+          if (terrain[nidx] === 'mountain') continue;
+          visited[nidx] = 1;
+          region.push(nidx);
+        }
+      }
+
+      // Collect boundary complete walls
+      const boundaryWalls = [];
+      const seenWall      = new Set();
+      for (const cidx of region) {
+        const cq = cidx % width;
+        const cr = (cidx / width) | 0;
+        for (const [nq, nr] of neighbors(cq, cr)) {
+          if (!inBounds(nq, nr, width, height)) continue;
+          const nidx = hexToIndex(nq, nr, width);
+          if (game.improvements[nidx] === IMPROVEMENT_WALL && !seenWall.has(nidx)) {
+            seenWall.add(nidx);
+            boundaryWalls.push(nidx);
+          }
+        }
+      }
+
+      if (boundaryWalls.length === 0) continue; // pure mountain enclosure — no fort
+
+      // Step 3: BFS through connected complete walls to mark all connected walls live (including spurs).
+      let wHead = 0;
+      while (wHead < boundaryWalls.length) {
+        const widx = boundaryWalls[wHead++];
+        if (liveWalls[widx]) continue;
+        liveWalls[widx] = 1;
+        const wq = widx % width;
+        const wr = (widx / width) | 0;
+        for (const [nq, nr] of neighbors(wq, wr)) {
+          if (!inBounds(nq, nr, width, height)) continue;
+          const nidx = hexToIndex(nq, nr, width);
+          if (!liveWalls[nidx] && game.improvements[nidx] === IMPROVEMENT_WALL) {
+            boundaryWalls.push(nidx);
+          }
+        }
+      }
+    }
+  }
+
+  return game;
+}
+
 // End the player's turn: dim old visible hexes, re-reveal all units, reset AP, increment turn.
-export function endPlayerTurn(game, width, height) {
+export function endPlayerTurn(game, terrain, width, height) {
   endTurn(game.fog, width, height);
 
   for (const ship of game.ships) {
@@ -230,6 +339,8 @@ export function endPlayerTurn(game, width, height) {
       if (c.aboard) c.sleeping = true;
     }
   }
+
+  detectForts(game, terrain, width, height);
   return game;
 }
 

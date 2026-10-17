@@ -61,7 +61,7 @@ High-elevation terrain. No unit can enter a mountain hex. Mountain hexes act as 
 
 ## Related Topics
 
-- [Forts](../concepts/forts.md)
+- [Forts](../concepts/fortifications.md)
 - [Crew and Ships](../concepts/units.md)
 - [Fog of War](../concepts/fog-of-war.md)
 - [Glossary](glossary.md)

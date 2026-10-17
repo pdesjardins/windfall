@@ -487,7 +487,7 @@ function maybeAutoEndTurn() {
   _autoEndTimer = setTimeout(() => {
     _autoEndTimer = null;
     if (!game || pendingUnits.length > 0) { setStatus(''); return; }
-    endPlayerTurn(game, MAP_WIDTH, MAP_HEIGHT);
+    endPlayerTurn(game, terrain, MAP_WIDTH, MAP_HEIGHT);
     syncRenderer();
     autoSelect();
     setStatus('');
@@ -501,6 +501,7 @@ function syncRenderer() {
   renderer.updateShips(game.ships);
   renderer.updateCrew(game.crew);
   renderer.updateImprovements(game.improvements);
+  renderer.updateLiveWalls(game.liveWalls);
   updateWindDisplay();
 }
 
@@ -663,7 +664,7 @@ btnEndTurn.addEventListener('click', () => {
   if (!game) return;
   cancelAutoEnd();
   cancelAdvance();
-  endPlayerTurn(game, MAP_WIDTH, MAP_HEIGHT);
+  endPlayerTurn(game, terrain, MAP_WIDTH, MAP_HEIGHT);
   syncRenderer();
   autoSelect();
 });
@@ -680,6 +681,7 @@ btnNewGame.addEventListener('click', () => {
 
   renderer.init(canvas, terrain, game.fog, game.ships, MAP_WIDTH, MAP_HEIGHT);
   renderer.updateCrew(game.crew);
+  renderer.updateLiveWalls(game.liveWalls);
   updateWindDisplay();
   autoSelect();
   setStatus('');

@@ -40,7 +40,7 @@ Wind shifts gradually as the game progresses. A route that is fast with a favora
 
 ## Crew on Land
 
-Crew are not affected by wind. They always receive 2 action points per turn regardless of conditions.
+Crew are not affected by wind. They always receive 1 action point per turn regardless of conditions.
 
 ## Related Topics
 

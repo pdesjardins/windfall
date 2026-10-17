@@ -27,7 +27,7 @@ Your crew never needs to build on mountain hexes. Mountains act as natural wall 
 
 A fort goes live the moment your wall segments — combined with any mountain hexes — form a **closed loop connected to itself**. The hexes enclosed by that loop become the fort interior.
 
-You do not need to declare the fort complete. The game detects the closed loop automatically after each wall segment is built.
+You do not need to declare the fort complete. The game detects the closed loop automatically at the end of each turn. When a wall segment completes and closes the loop, the perimeter lights up at turn end.
 
 This means you can build forts of any shape. A small tight ring is quick to build but encloses less space. A large ring takes more turns but may enclose better terrain. A ring that uses mountain faces as walls is cheaper to close. Reading the landscape and finding the natural shapes is the skill.
 
