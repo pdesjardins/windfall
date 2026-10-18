@@ -29,9 +29,17 @@ var _valid_targets: Array[Vector2i] = []
 var _drag_start := Vector2.ZERO
 var _dev_fog_disabled := false
 var _overlay: SelectionOverlay
+var _game_seed: int = 0
+var _wind_dir: int = 0
+var _turn: int = 0
+var _ship_budget: int = Wind.SHIP_MOVE_BUDGET
+var _target_costs: Dictionary = {}
+var _wind_indicator: WindIndicator
 
 
 func _ready() -> void:
+	_game_seed = randi()
+	_wind_dir = _game_seed % 6
 	_setup_tileset()
 	_generate_terrain()
 	_render_terrain()
@@ -42,12 +50,16 @@ func _ready() -> void:
 	_overlay = SelectionOverlay.new()
 	$World.add_child(_overlay)
 	_setup_camera()
+	_setup_wind_indicator()
 
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed:
 		if event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_F:
 			_toggle_dev_fog()
+		elif not event.ctrl_pressed and not event.shift_pressed:
+			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
+				_end_turn()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_drag_start = event.position
@@ -64,6 +76,7 @@ func _handle_click(world_pos: Vector2) -> void:
 			_move_ship(clicked)
 		_ship_selected = false
 		_valid_targets.clear()
+		_target_costs.clear()
 		_overlay.update(false, Vector2.ZERO, [])
 	elif clicked == _ship_position:
 		_ship_selected = true
@@ -75,11 +88,37 @@ func _handle_click(world_pos: Vector2) -> void:
 
 
 func _get_valid_targets() -> Array[Vector2i]:
-	var targets: Array[Vector2i] = []
 	var layer := $World/TerrainLayer as TileMapLayer
-	for neighbor: Vector2i in layer.get_surrounding_cells(_ship_position):
-		if _in_bounds(neighbor) and terrain_data[neighbor.y * MAP_WIDTH + neighbor.x] == TERRAIN_OCEAN:
-			targets.append(neighbor)
+	_target_costs.clear()
+
+	# Dijkstra: find all ocean cells reachable within remaining AP budget
+	var dist: Dictionary = {_ship_position: 0}
+	var queue: Array[Vector2i] = [_ship_position]
+
+	while queue.size() > 0:
+		var cell: Vector2i = queue.pop_front()
+		var cost_so_far: int = dist[cell]
+		for i in 6:
+			var neighbor: Vector2i = layer.get_surrounding_cells(cell)[i]
+			if not _in_bounds(neighbor):
+				continue
+			if terrain_data[neighbor.y * MAP_WIDTH + neighbor.x] != TERRAIN_OCEAN:
+				continue
+			var step_cost := Wind.move_cost(_wind_dir, i)
+			if step_cost == Wind.BLOCKED:
+				continue
+			var new_cost := cost_so_far + step_cost
+			if new_cost > _ship_budget:
+				continue
+			if not dist.has(neighbor) or dist[neighbor] > new_cost:
+				dist[neighbor] = new_cost
+				queue.append(neighbor)
+
+	var targets: Array[Vector2i] = []
+	for cell: Vector2i in dist.keys():
+		if cell != _ship_position:
+			_target_costs[cell] = dist[cell]
+			targets.append(cell)
 	return targets
 
 
@@ -92,13 +131,7 @@ func _move_ship(target: Vector2i) -> void:
 	var from_world := layer.map_to_local(_ship_position)
 	var to_world := layer.map_to_local(target)
 
-	var neighbors := layer.get_surrounding_cells(_ship_position)
-	for i in neighbors.size():
-		if neighbors[i] == target:
-			_ship_direction = i
-			break
-
-	fog.end_turn()
+	_ship_budget -= _target_costs.get(target, 0)
 	_ship_position = target
 	fog.set_visible(_ship_position.x, _ship_position.y, SHIP_SIGHT_RANGE, layer)
 	_render_fog()
@@ -107,6 +140,40 @@ func _move_ship(target: Vector2i) -> void:
 	marker.position = to_world
 	marker.rotation = (to_world - from_world).angle()
 	marker.queue_redraw()
+
+	_update_wind_indicator()
+
+
+func _end_turn() -> void:
+	_turn += 1
+	var shift := Wind.wind_shift(_game_seed, _turn)
+	_wind_dir = Wind.apply_shift(_wind_dir, shift)
+	_ship_budget = Wind.SHIP_MOVE_BUDGET
+	fog.end_turn()
+	_render_fog()
+	_update_wind_indicator()
+	if _ship_selected:
+		_ship_selected = false
+		_valid_targets.clear()
+		_target_costs.clear()
+		_overlay.update(false, Vector2.ZERO, [])
+
+
+func _setup_wind_indicator() -> void:
+	_wind_indicator = WindIndicator.new()
+	_wind_indicator.position = Vector2(60.0, 80.0)
+	$UI.add_child(_wind_indicator)
+	_update_wind_indicator()
+
+
+func _update_wind_indicator() -> void:
+	var layer := $World/TerrainLayer as TileMapLayer
+	var origin := layer.map_to_local(_ship_position)
+	var neighbors := layer.get_surrounding_cells(_ship_position)
+	var wind_angle := 0.0
+	if _wind_dir < neighbors.size():
+		wind_angle = (layer.map_to_local(neighbors[_wind_dir]) - origin).angle()
+	_wind_indicator.set_state(wind_angle, _ship_budget)
 
 
 func _setup_tileset() -> void:
@@ -213,11 +280,18 @@ func _find_starting_position() -> Vector2i:
 
 func _place_ship() -> void:
 	_ship_position = _find_starting_position()
+	_ship_direction = _wind_dir
 	fog.set_visible(_ship_position.x, _ship_position.y, SHIP_SIGHT_RANGE, $World/TerrainLayer)
 
-	var world_pos := ($World/TerrainLayer as TileMapLayer).map_to_local(_ship_position)
+	var layer := $World/TerrainLayer as TileMapLayer
+	var world_pos := layer.map_to_local(_ship_position)
 	var marker := ShipMarker.new()
 	marker.position = world_pos
+
+	var neighbors := layer.get_surrounding_cells(_ship_position)
+	if _wind_dir < neighbors.size():
+		marker.rotation = (layer.map_to_local(neighbors[_wind_dir]) - world_pos).angle()
+
 	$World/Units.add_child(marker)
 
 
