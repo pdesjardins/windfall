@@ -32,9 +32,11 @@ The player commands *Resolution*. The AI commands *Accord*.
 
 ## Platform
 
-- **Environment:** Modern desktop browser (Chrome, Firefox, Safari, Edge). No mobile target.
-- **Technology:** Pure HTML5, CSS3, and vanilla JavaScript (ES2020+). No frameworks, no build tools, no backend.
-- **Performance:** Page load including all assets should complete within 2 seconds on a standard broadband connection. Terrain generation may take up to 2 seconds after load. All subsequent turn processing must be imperceptible.
+- **Environment:** Desktop application distributed via Godot 4.7 export. No mobile target.
+- **Technology:** Godot 4.7, GDScript 4, GL Compatibility renderer, TileMapLayer hex grid. SVG assets for terrain tiles and unit sprites, loaded as Texture2D at runtime.
+- **Performance:** All turn processing must be imperceptible.
+
+> **Port note (2026-10-17):** This project was originally specced as a pure HTML/JS browser game. Implementation has migrated to Godot 4.7 for its mature hex-grid TileMapLayer, built-in scene tree, and native export support. Design goals and game rules are unchanged.
 
 ---
 
@@ -93,7 +95,8 @@ Three visibility states apply to every hex, tracked separately per player:
 
 Sight ranges:
 - Ship: 3 hexes (elevated mast provides longer view)
-- Crew on land: 2 hexes
+- Crew on land: 1 hex
+- Live wall segment: 1 hex (a crewed fortification maintains watch)
 
 The enemy flag becomes visible only when a player unit is directly adjacent to it (1 hex distance), regardless of general visibility.
 
@@ -129,7 +132,7 @@ Crew are the player's land-based units. All crew are identical in capability.
 
 **Encamp:** A crew unit may be ordered to encamp (F key). An encamped crew is excluded from the turn queue until the player explicitly clicks it to wake it. Encamped crew do not require turn-passes and do not trigger auto-end turn. An encamped crew adjacent to an enemy unit returns to normal queue participation automatically (implementation TBD).
 
-**Starting count:** TBD by playtesting. Initial value: 4 crew per player.
+**Starting count:** 3 crew per player.
 
 ### Ship
 
@@ -143,10 +146,10 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 **Capabilities:**
 - Navigate ocean hexes (1 AP per hex)
-- Transport crew (capacity TBD; initial value: 6 crew)
+- Transport crew (capacity: 10 crew)
 - Fire cannons at adjacent enemy units (1 AP; range 1 hex; see Combat)
-- Deploy crew to an adjacent shore-adjacent land hex (1 AP)
-- Embark crew from an adjacent shore-adjacent land hex (1 AP)
+- Deploy crew to an adjacent shore-adjacent land hex (free action)
+- Embark crew from an adjacent shore-adjacent land hex (free action)
 
 **Stacking:** Multiple friendly ships may occupy the same hex.
 
@@ -181,7 +184,7 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 
 1. A crew unit stops on a grassland, forest, or stone hex and initiates building (B key). The crew enters **building** status immediately.
 2. Building status locks the crew to that hex for 3 consecutive turns: the turn building begins plus 2 turns in which the crew skips all other actions. The crew cannot move, embark, improve terrain, or perform any other action while building.
-3. After all 3 turns complete, the hex becomes a **wall** improvement. No partial wall is visible or usable during construction — WALL_1 and WALL_2 are internal tracking states only; they do not fire cannons, do not contribute to fort-loop detection, and satisfy no wall condition.
+3. During construction, the hex shows a visual stage indicator: a dashed outline at WALL_1 and a semi-opaque fill at WALL_2. These stages are visual feedback only — they do not fire cannons, do not contribute to fort-loop detection, and satisfy no wall condition. After all 3 turns complete, the hex becomes a full **wall** improvement.
 4. If the building crew is destroyed during construction, the work is abandoned. No partial improvement is left on the hex.
 5. Only one crew unit may build on a given hex at a time.
 6. The crew unit may then move to an adjacent hex and repeat.
@@ -331,7 +334,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 1. **Human turn:** The player takes all actions for their units. When satisfied, the player ends their turn.
 2. **AI turn:** The AI takes all actions for its units. When complete, the next human turn begins.
 
-**Action points:** Crew receive 2 AP per turn. Ships receive a movement budget of 6 points per turn; usable distance varies by direction relative to wind (see Wind section).
+**Action points:** Crew receive 1 AP per turn. Ships receive a movement budget of 6 points per turn; usable distance varies by direction relative to wind (see Wind section).
 
 ---
 
@@ -394,3 +397,12 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-04-27 | Fort detection runs at end of turn, not after each wall placement | Wall completion already only happens at turn end via endPlayerTurn. Running detection there keeps all end-of-turn state transitions in one place and avoids partial-state detection mid-turn. |
 | 2026-04-27 | Live fort indicated by perimeter lines between adjacent live wall centers; no interior fill | Perimeter lines give clear feedback without needing interior hex tracking. Interior marking deferred until fort capabilities such as cannon fire and production require distinguishing interior hexes. |
 | 2026-04-27 | Mixed-player perimeter ownership check deferred | AI building not yet implemented; all walls are currently human-owned. Ownership tracking per hex will be added when AI building is introduced. |
+| 2026-10-17 | Ported from HTML/JS to Godot 4.7 | Godot's TileMapLayer provides a mature hex-grid system, built-in scene tree, and native export; eliminates the need for a custom hex-grid renderer and canvas management system |
+| 2026-10-17 | Development map size 80×50; design target remains 300×200 | Smaller map speeds iteration during early development; Godot's TileMapLayer handles viewport culling natively, so the design-target map size remains achievable |
+| 2026-10-17 | Crew AP is 1 per turn; Turn Structure section previously said 2 (now corrected) | Consistent with JS implementation constant CREW_AP=1; the Turn Structure section contained an earlier draft value that contradicted the Crew section |
+| 2026-10-17 | Crew sight range reduced to 1 hex | 2-hex sight made fog of war less meaningful in early testing; 1 hex requires crew to actively explore adjacent terrain |
+| 2026-10-17 | Starting crew count set to 3 per player | 4 felt slightly crowded on the development map; 3 gives each crew unit more individual weight |
+| 2026-10-17 | Ship crew capacity set to 10 | Higher capacity removes artificial constraints during early development; subject to revision during playtesting |
+| 2026-10-17 | Embark and disembark are free actions (0 AP) | Charging 1 AP made the embark/disembark cycle feel like a tax on positioning rather than a meaningful decision; free embark lets players focus on crew placement and construction |
+| 2026-10-17 | Live wall segments reveal fog of war (sight range 1) | A crewed fortification maintains watch over adjacent terrain; consistent with treating forts as defended positions rather than inert structures |
+| 2026-10-17 | Wall construction stages shown visually | Dashed outline at WALL_1 and semi-opaque fill at WALL_2 provide feedback that a crew unit is actively building; invisible progress left the interaction opaque |
