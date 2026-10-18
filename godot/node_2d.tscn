@@ -1,0 +1,23 @@
+[gd_scene format=3 uid="uid://co8rbun0vlwhd"]
+
+[ext_resource type="Script" uid="uid://k6de0dgidn4n" path="res://Main.gd" id="1_wtcfe"]
+[ext_resource type="Script" uid="uid://dxleqjfqgykxp" path="res://CameraController.gd" id="2_0e48y"]
+
+[node name="Main" type="Node2D" unique_id=1660209523]
+script = ExtResource("1_wtcfe")
+
+[node name="World" type="Node2D" parent="." unique_id=2054767809]
+
+[node name="TerrainLayer" type="TileMapLayer" parent="World" unique_id=1495900547]
+
+[node name="ImprovementLayer" type="TileMapLayer" parent="World" unique_id=1160131336]
+
+[node name="FogLayer" type="TileMapLayer" parent="World" unique_id=1769897341]
+
+[node name="Units" type="Node2D" parent="World" unique_id=207223386]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=819930892]
+
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1297280312]
+visible = false
+script = ExtResource("2_0e48y")
