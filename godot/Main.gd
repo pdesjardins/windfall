@@ -9,6 +9,13 @@ const TERRAIN_OCEAN := 0
 const TERRAIN_GRASSLAND := 1
 const TERRAIN_FOREST := 2
 const TERRAIN_STONE := 3
+const TERRAIN_MOUNTAIN := 4
+
+# Tunable thresholds — all noise values are in the range -1.0 to 1.0
+const WATER_THRESHOLD: float = 0.05
+const STONE_THRESHOLD: float = 0.30
+const MOUNTAIN_RIDGE_THRESHOLD: float = 0.52
+const FOREST_THRESHOLD: float = 0.0
 
 var terrain_data: PackedByteArray
 
@@ -27,7 +34,7 @@ func _setup_tileset() -> void:
 	ts.tile_offset_axis = TileSet.TILE_OFFSET_AXIS_VERTICAL
 	ts.tile_size = Vector2i(TILE_W, TILE_H)
 
-	var tile_names := ["ocean", "grassland", "forest", "stone"]
+	var tile_names := ["ocean", "grassland", "forest", "stone", "mountain"]
 	for name in tile_names:
 		var tex: Texture2D = load("res://tiles/" + name + ".svg")
 		var source := TileSetAtlasSource.new()
@@ -40,18 +47,50 @@ func _setup_tileset() -> void:
 
 
 func _generate_terrain() -> void:
+	var seed := randi()
+	print("Map seed: ", seed)
+
+	var elevation := FastNoiseLite.new()
+	elevation.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	elevation.seed = seed
+	elevation.frequency = 0.04
+	elevation.fractal_type = FastNoiseLite.FRACTAL_FBM
+	elevation.fractal_octaves = 4
+
+	var biome := FastNoiseLite.new()
+	biome.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	biome.seed = seed + 1000
+	biome.frequency = 0.06
+	biome.fractal_type = FastNoiseLite.FRACTAL_FBM
+	biome.fractal_octaves = 3
+
+	var ridge := FastNoiseLite.new()
+	ridge.noise_type = FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+	ridge.seed = seed + 2000
+	ridge.frequency = 0.035
+	ridge.fractal_type = FastNoiseLite.FRACTAL_RIDGED
+	ridge.fractal_octaves = 4
+
 	terrain_data = PackedByteArray()
 	terrain_data.resize(MAP_WIDTH * MAP_HEIGHT)
-	for i in terrain_data.size():
-		var roll := randf()
-		if roll < 0.40:
-			terrain_data[i] = TERRAIN_OCEAN
-		elif roll < 0.65:
-			terrain_data[i] = TERRAIN_GRASSLAND
-		elif roll < 0.85:
-			terrain_data[i] = TERRAIN_FOREST
-		else:
-			terrain_data[i] = TERRAIN_STONE
+
+	for y in MAP_HEIGHT:
+		for x in MAP_WIDTH:
+			var elev := elevation.get_noise_2d(float(x), float(y))
+			var bio := biome.get_noise_2d(float(x), float(y))
+			var rdg := ridge.get_noise_2d(float(x), float(y))
+			var t: int
+			if elev < WATER_THRESHOLD:
+				t = TERRAIN_OCEAN
+			elif elev > STONE_THRESHOLD and rdg > MOUNTAIN_RIDGE_THRESHOLD:
+				t = TERRAIN_MOUNTAIN
+			elif elev > STONE_THRESHOLD:
+				t = TERRAIN_STONE
+			elif bio > FOREST_THRESHOLD:
+				t = TERRAIN_FOREST
+			else:
+				t = TERRAIN_GRASSLAND
+			terrain_data[y * MAP_WIDTH + x] = t
 
 
 func _render_terrain() -> void:

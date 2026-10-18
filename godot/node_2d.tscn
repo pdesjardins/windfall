@@ -19,4 +19,5 @@ script = ExtResource("1_wtcfe")
 [node name="UI" type="CanvasLayer" parent="." unique_id=819930892]
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=1297280312]
+visible = false
 script = ExtResource("2_0e48y")
