@@ -12,10 +12,17 @@ const TERRAIN_STONE := 3
 const TERRAIN_MOUNTAIN := 4
 
 const SHIP_SIGHT_RANGE := 3
+const CREW_SIGHT_RANGE := 1
+const WALL_SIGHT_RANGE := 1
 const SHIP_CAPACITY := 10
 const CREW_COUNT := 3
 const CREW_AP_BUDGET := 1
 const DRAG_THRESHOLD := 4.0
+
+const IMPROVEMENT_NONE := 0
+const IMPROVEMENT_WALL_1 := 1
+const IMPROVEMENT_WALL_2 := 2
+const IMPROVEMENT_WALL := 3
 
 # Tunable thresholds — all noise values are in the range -1.0 to 1.0
 const WATER_THRESHOLD: float = 0.05
@@ -24,7 +31,10 @@ const MOUNTAIN_RIDGE_THRESHOLD: float = 0.52
 const FOREST_THRESHOLD: float = 0.0
 
 var terrain_data: PackedByteArray
+var improvements: PackedByteArray
+var live_walls: PackedByteArray
 var fog := Fog.new()
+var _fort_lines: FortLines
 var _ship_position := Vector2i.ZERO
 var _ship_direction: int = 1
 var _ship_selected := false
@@ -49,11 +59,18 @@ func _ready() -> void:
 	_wind_dir = _game_seed % 6
 	_setup_tileset()
 	_generate_terrain()
+	improvements = PackedByteArray()
+	improvements.resize(MAP_WIDTH * MAP_HEIGHT)
+	live_walls = PackedByteArray()
+	live_walls.resize(MAP_WIDTH * MAP_HEIGHT)
 	_render_terrain()
 	_setup_fog_layer()
+	_setup_improvement_layer()
 	fog.setup(MAP_WIDTH, MAP_HEIGHT)
 	_place_ship()
 	_render_fog()
+	_fort_lines = FortLines.new()
+	$World.add_child(_fort_lines)
 	_overlay = SelectionOverlay.new()
 	$World.add_child(_overlay)
 	_setup_camera()
@@ -67,6 +84,8 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif not event.ctrl_pressed and not event.shift_pressed:
 			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 				_end_turn()
+			elif event.keycode == KEY_B:
+				_try_start_build()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		if event.pressed:
 			_drag_start = event.position
@@ -103,6 +122,8 @@ func _handle_click(world_pos: Vector2) -> void:
 		_select_ship()
 	else:
 		for crew: CrewMarker in _crew_units:
+			if crew.building:
+				continue
 			if crew.map_pos == clicked:
 				_select_crew(crew)
 				break
@@ -170,9 +191,28 @@ func _end_turn() -> void:
 	_wind_dir = Wind.apply_shift(_wind_dir, shift)
 	_ship_budget = Wind.SHIP_MOVE_BUDGET
 	for crew: CrewMarker in _crew_units:
-		crew.ap_remaining = CREW_AP_BUDGET
+		if not crew.building:
+			crew.ap_remaining = CREW_AP_BUDGET
+		else:
+			var idx := crew.build_pos.y * MAP_WIDTH + crew.build_pos.x
+			match improvements[idx]:
+				IMPROVEMENT_WALL_1:
+					improvements[idx] = IMPROVEMENT_WALL_2
+				IMPROVEMENT_WALL_2:
+					improvements[idx] = IMPROVEMENT_WALL
+					crew.building = false
 	_clear_selection()
+	_render_improvements()
+	_detect_forts()
 	fog.end_turn()
+	var fl := $World/TerrainLayer as TileMapLayer
+	fog.set_visible(_ship_position.x, _ship_position.y, SHIP_SIGHT_RANGE, fl)
+	for crew: CrewMarker in _crew_units:
+		fog.set_visible(crew.map_pos.x, crew.map_pos.y, CREW_SIGHT_RANGE, fl)
+	for y in MAP_HEIGHT:
+		for x in MAP_WIDTH:
+			if live_walls[y * MAP_WIDTH + x] == 1:
+				fog.set_visible(x, y, WALL_SIGHT_RANGE, fl)
 	_render_fog()
 	_update_wind_indicator()
 
@@ -221,8 +261,9 @@ func _get_disembark_targets() -> Array[Vector2i]:
 	for neighbor: Vector2i in layer.get_surrounding_cells(_ship_position):
 		if not _in_bounds(neighbor):
 			continue
-		var t := terrain_data[neighbor.y * MAP_WIDTH + neighbor.x]
-		if t != TERRAIN_OCEAN and t != TERRAIN_MOUNTAIN:
+		var idx := neighbor.y * MAP_WIDTH + neighbor.x
+		var t := terrain_data[idx]
+		if t != TERRAIN_OCEAN and t != TERRAIN_MOUNTAIN and improvements[idx] != IMPROVEMENT_WALL:
 			targets.append(neighbor)
 	return targets
 
@@ -257,6 +298,8 @@ func _disembark_crew(target: Vector2i) -> void:
 	marker.ap_remaining = CREW_AP_BUDGET
 	_crew_units.append(marker)
 	$World/Units.add_child(marker)
+	fog.set_visible(target.x, target.y, CREW_SIGHT_RANGE, layer)
+	_render_fog()
 
 
 func _embark_crew(crew: CrewMarker) -> void:
@@ -270,6 +313,140 @@ func _move_crew(crew: CrewMarker, target: Vector2i) -> void:
 	crew.map_pos = target
 	crew.position = layer.map_to_local(target)
 	crew.ap_remaining -= 1
+	fog.set_visible(target.x, target.y, CREW_SIGHT_RANGE, layer)
+	_render_fog()
+
+
+func _try_start_build() -> void:
+	if _selected_crew == null or _selected_crew.building or _selected_crew.ap_remaining == 0:
+		return
+	var pos := _selected_crew.map_pos
+	var idx := pos.y * MAP_WIDTH + pos.x
+	var t := terrain_data[idx]
+	if t == TERRAIN_OCEAN or t == TERRAIN_MOUNTAIN:
+		return
+	if improvements[idx] != IMPROVEMENT_NONE:
+		return
+	_selected_crew.building = true
+	_selected_crew.build_pos = pos
+	_selected_crew.ap_remaining = 0
+	improvements[idx] = IMPROVEMENT_WALL_1
+	_render_improvements()
+	_clear_selection()
+
+
+func _setup_improvement_layer() -> void:
+	var ts := TileSet.new()
+	ts.tile_shape = TileSet.TILE_SHAPE_HEXAGON
+	ts.tile_layout = TileSet.TILE_LAYOUT_STACKED
+	ts.tile_offset_axis = TileSet.TILE_OFFSET_AXIS_VERTICAL
+	ts.tile_size = Vector2i(TILE_W, TILE_H)
+
+	for name in ["wall_1", "wall_2", "wall"]:
+		var tex: Texture2D = load("res://tiles/" + name + ".svg")
+		var source := TileSetAtlasSource.new()
+		source.texture = tex
+		source.texture_region_size = Vector2i(TILE_W, TILE_H)
+		source.create_tile(Vector2i(0, 0))
+		ts.add_source(source)
+
+	$World/ImprovementLayer.tile_set = ts
+
+
+func _render_improvements() -> void:
+	var layer: TileMapLayer = $World/ImprovementLayer
+	for y in MAP_HEIGHT:
+		for x in MAP_WIDTH:
+			match improvements[y * MAP_WIDTH + x]:
+				IMPROVEMENT_WALL_1:
+					layer.set_cell(Vector2i(x, y), 0, Vector2i(0, 0))
+				IMPROVEMENT_WALL_2:
+					layer.set_cell(Vector2i(x, y), 1, Vector2i(0, 0))
+				IMPROVEMENT_WALL:
+					layer.set_cell(Vector2i(x, y), 2, Vector2i(0, 0))
+				_:
+					layer.erase_cell(Vector2i(x, y))
+
+
+func _detect_forts() -> void:
+	live_walls.fill(0)
+	var layer := $World/TerrainLayer as TileMapLayer
+
+	# Step 1: outside-in BFS — mark all open cells reachable from the exterior
+	var exterior := {}
+	var queue: Array[Vector2i] = []
+	for y in MAP_HEIGHT:
+		for x in MAP_WIDTH:
+			var idx := y * MAP_WIDTH + x
+			if improvements[idx] == IMPROVEMENT_WALL or terrain_data[idx] == TERRAIN_MOUNTAIN:
+				continue
+			if terrain_data[idx] == TERRAIN_OCEAN or x == 0 or x == MAP_WIDTH - 1 or y == 0 or y == MAP_HEIGHT - 1:
+				var cell := Vector2i(x, y)
+				exterior[cell] = true
+				queue.append(cell)
+	while queue.size() > 0:
+		var cell: Vector2i = queue.pop_front()
+		for neighbor: Vector2i in layer.get_surrounding_cells(cell):
+			if not _in_bounds(neighbor) or exterior.has(neighbor):
+				continue
+			var nidx := neighbor.y * MAP_WIDTH + neighbor.x
+			if improvements[nidx] == IMPROVEMENT_WALL or terrain_data[nidx] == TERRAIN_MOUNTAIN:
+				continue
+			exterior[neighbor] = true
+			queue.append(neighbor)
+
+	# Step 2: BFS each enclosed land region, collect boundary walls
+	var visited := {}
+	for y in MAP_HEIGHT:
+		for x in MAP_WIDTH:
+			var cell := Vector2i(x, y)
+			var idx := y * MAP_WIDTH + x
+			if exterior.has(cell) or visited.has(cell):
+				continue
+			if improvements[idx] == IMPROVEMENT_WALL or terrain_data[idx] == TERRAIN_MOUNTAIN or terrain_data[idx] == TERRAIN_OCEAN:
+				continue
+
+			var component_set := {cell: true}
+			var rqueue: Array[Vector2i] = [cell]
+			var boundary_walls: Array[Vector2i] = []
+			var seen_walls := {}
+
+			while rqueue.size() > 0:
+				var rc: Vector2i = rqueue.pop_front()
+				for neighbor: Vector2i in layer.get_surrounding_cells(rc):
+					if not _in_bounds(neighbor):
+						continue
+					var nidx := neighbor.y * MAP_WIDTH + neighbor.x
+					if terrain_data[nidx] == TERRAIN_MOUNTAIN:
+						continue
+					if improvements[nidx] == IMPROVEMENT_WALL:
+						if not seen_walls.has(neighbor):
+							seen_walls[neighbor] = true
+							boundary_walls.append(neighbor)
+					elif not exterior.has(neighbor) and not component_set.has(neighbor):
+						component_set[neighbor] = true
+						rqueue.append(neighbor)
+
+			for c: Vector2i in component_set.keys():
+				visited[c] = true
+
+			if boundary_walls.is_empty():
+				continue
+
+			# Step 3: BFS outward through all connected walls (marks spurs live too)
+			var wi := 0
+			while wi < boundary_walls.size():
+				var wc: Vector2i = boundary_walls[wi]
+				wi += 1
+				live_walls[wc.y * MAP_WIDTH + wc.x] = 1
+				for neighbor: Vector2i in layer.get_surrounding_cells(wc):
+					if not _in_bounds(neighbor) or seen_walls.has(neighbor):
+						continue
+					if improvements[neighbor.y * MAP_WIDTH + neighbor.x] == IMPROVEMENT_WALL:
+						seen_walls[neighbor] = true
+						boundary_walls.append(neighbor)
+
+	_fort_lines.update(live_walls, MAP_WIDTH, MAP_HEIGHT, layer)
 
 
 func _setup_wind_indicator() -> void:
