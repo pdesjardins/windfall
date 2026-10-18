@@ -12,6 +12,9 @@ const TERRAIN_STONE := 3
 const TERRAIN_MOUNTAIN := 4
 
 const SHIP_SIGHT_RANGE := 3
+const SHIP_CAPACITY := 10
+const CREW_COUNT := 3
+const CREW_AP_BUDGET := 1
 const DRAG_THRESHOLD := 4.0
 
 # Tunable thresholds — all noise values are in the range -1.0 to 1.0
@@ -34,6 +37,10 @@ var _wind_dir: int = 0
 var _turn: int = 0
 var _ship_budget: int = Wind.SHIP_MOVE_BUDGET
 var _target_costs: Dictionary = {}
+var _disembark_targets: Array[Vector2i] = []
+var _crew_aboard: int = 0
+var _crew_units: Array[CrewMarker] = []
+var _selected_crew: CrewMarker = null
 var _wind_indicator: WindIndicator
 
 
@@ -74,17 +81,31 @@ func _handle_click(world_pos: Vector2) -> void:
 	if _ship_selected:
 		if clicked in _valid_targets:
 			_move_ship(clicked)
-		_ship_selected = false
-		_valid_targets.clear()
-		_target_costs.clear()
-		_overlay.update(false, Vector2.ZERO, [])
+			_clear_selection()
+		elif clicked in _disembark_targets and _crew_aboard > 0:
+			_disembark_crew(clicked)
+			_select_ship()
+		else:
+			_clear_selection()
+	elif _selected_crew != null:
+		if clicked in _valid_targets:
+			_move_crew(_selected_crew, clicked)
+			if _crew_can_embark(_selected_crew):
+				_select_crew(_selected_crew)
+			else:
+				_clear_selection()
+		elif clicked == _ship_position and _crew_can_embark(_selected_crew):
+			_embark_crew(_selected_crew)
+			_clear_selection()
+		else:
+			_clear_selection()
 	elif clicked == _ship_position:
-		_ship_selected = true
-		_valid_targets = _get_valid_targets()
-		var target_worlds: Array[Vector2] = []
-		for t in _valid_targets:
-			target_worlds.append(layer.map_to_local(t))
-		_overlay.update(true, layer.map_to_local(_ship_position), target_worlds)
+		_select_ship()
+	else:
+		for crew: CrewMarker in _crew_units:
+			if crew.map_pos == clicked:
+				_select_crew(crew)
+				break
 
 
 func _get_valid_targets() -> Array[Vector2i]:
@@ -139,7 +160,6 @@ func _move_ship(target: Vector2i) -> void:
 	var marker := $World/Units.get_child(0) as ShipMarker
 	marker.position = to_world
 	marker.rotation = (to_world - from_world).angle()
-	marker.queue_redraw()
 
 	_update_wind_indicator()
 
@@ -149,14 +169,107 @@ func _end_turn() -> void:
 	var shift := Wind.wind_shift(_game_seed, _turn)
 	_wind_dir = Wind.apply_shift(_wind_dir, shift)
 	_ship_budget = Wind.SHIP_MOVE_BUDGET
+	for crew: CrewMarker in _crew_units:
+		crew.ap_remaining = CREW_AP_BUDGET
+	_clear_selection()
 	fog.end_turn()
 	_render_fog()
 	_update_wind_indicator()
-	if _ship_selected:
-		_ship_selected = false
-		_valid_targets.clear()
-		_target_costs.clear()
-		_overlay.update(false, Vector2.ZERO, [])
+
+
+func _clear_selection() -> void:
+	_ship_selected = false
+	_selected_crew = null
+	_valid_targets.clear()
+	_target_costs.clear()
+	_disembark_targets.clear()
+	_overlay.update(false, Vector2.ZERO, [])
+
+
+func _select_ship() -> void:
+	var layer := $World/TerrainLayer as TileMapLayer
+	_ship_selected = true
+	_valid_targets = _get_valid_targets()
+	_disembark_targets = _get_disembark_targets()
+	var target_worlds: Array[Vector2] = []
+	for t in _valid_targets:
+		target_worlds.append(layer.map_to_local(t))
+	var disembark_worlds: Array[Vector2] = []
+	for t in _disembark_targets:
+		disembark_worlds.append(layer.map_to_local(t))
+	_overlay.update(true, layer.map_to_local(_ship_position), target_worlds, disembark_worlds)
+
+
+func _select_crew(crew: CrewMarker) -> void:
+	var layer := $World/TerrainLayer as TileMapLayer
+	_selected_crew = crew
+	_valid_targets = _get_crew_targets(crew)
+	var target_worlds: Array[Vector2] = []
+	for t in _valid_targets:
+		target_worlds.append(layer.map_to_local(t))
+	var embark_world: Array[Vector2] = []
+	if _crew_can_embark(crew):
+		embark_world.append(layer.map_to_local(_ship_position))
+	_overlay.update(true, layer.map_to_local(crew.map_pos), target_worlds, embark_world)
+
+
+func _get_disembark_targets() -> Array[Vector2i]:
+	if _crew_aboard == 0:
+		return []
+	var targets: Array[Vector2i] = []
+	var layer := $World/TerrainLayer as TileMapLayer
+	for neighbor: Vector2i in layer.get_surrounding_cells(_ship_position):
+		if not _in_bounds(neighbor):
+			continue
+		var t := terrain_data[neighbor.y * MAP_WIDTH + neighbor.x]
+		if t != TERRAIN_OCEAN and t != TERRAIN_MOUNTAIN:
+			targets.append(neighbor)
+	return targets
+
+
+func _get_crew_targets(crew: CrewMarker) -> Array[Vector2i]:
+	if crew.ap_remaining == 0:
+		return []
+	var targets: Array[Vector2i] = []
+	var layer := $World/TerrainLayer as TileMapLayer
+	for neighbor: Vector2i in layer.get_surrounding_cells(crew.map_pos):
+		if not _in_bounds(neighbor):
+			continue
+		var t := terrain_data[neighbor.y * MAP_WIDTH + neighbor.x]
+		if t != TERRAIN_OCEAN and t != TERRAIN_MOUNTAIN:
+			targets.append(neighbor)
+	return targets
+
+
+func _crew_can_embark(crew: CrewMarker) -> bool:
+	if _crew_aboard >= SHIP_CAPACITY:
+		return false
+	var layer := $World/TerrainLayer as TileMapLayer
+	return _ship_position in layer.get_surrounding_cells(crew.map_pos)
+
+
+func _disembark_crew(target: Vector2i) -> void:
+	_crew_aboard -= 1
+	var layer := $World/TerrainLayer as TileMapLayer
+	var marker := CrewMarker.new()
+	marker.map_pos = target
+	marker.position = layer.map_to_local(target)
+	marker.ap_remaining = CREW_AP_BUDGET
+	_crew_units.append(marker)
+	$World/Units.add_child(marker)
+
+
+func _embark_crew(crew: CrewMarker) -> void:
+	_crew_aboard += 1
+	_crew_units.erase(crew)
+	crew.queue_free()
+
+
+func _move_crew(crew: CrewMarker, target: Vector2i) -> void:
+	var layer := $World/TerrainLayer as TileMapLayer
+	crew.map_pos = target
+	crew.position = layer.map_to_local(target)
+	crew.ap_remaining -= 1
 
 
 func _setup_wind_indicator() -> void:
@@ -281,6 +394,7 @@ func _find_starting_position() -> Vector2i:
 func _place_ship() -> void:
 	_ship_position = _find_starting_position()
 	_ship_direction = _wind_dir
+	_crew_aboard = CREW_COUNT
 	fog.set_visible(_ship_position.x, _ship_position.y, SHIP_SIGHT_RANGE, $World/TerrainLayer)
 
 	var layer := $World/TerrainLayer as TileMapLayer
