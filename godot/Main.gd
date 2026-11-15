@@ -50,8 +50,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		if event.ctrl_pressed and event.shift_pressed and event.keycode == KEY_F:
 			_toggle_dev_fog()
 		elif not event.ctrl_pressed and not event.shift_pressed:
-			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER \
-					or event.keycode == KEY_SPACE:
+			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 				_end_turn()
 			elif event.keycode == KEY_B:
 				_try_start_build()
@@ -304,7 +303,7 @@ func _setup_hud() -> void:
 	_hud_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT, Control.PRESET_MODE_MINSIZE, 12)
 	_hud_label.grow_vertical = Control.GROW_DIRECTION_BEGIN
 
-	# No focus, so Space/Enter always reach the end-turn key handler instead of
+	# No focus, so Enter always reaches the end-turn key handler instead of
 	# re-triggering a focused button.
 	var button := Button.new()
 	button.text = "End Turn (Enter)"
@@ -315,7 +314,7 @@ func _setup_hud() -> void:
 
 
 func _update_hud() -> void:
-	_hud_label.text = "Turn %d   Crew aboard: %d\nEnter / Space: end turn   B: build wall (crew selected)" \
+	_hud_label.text = "Turn %d   Crew aboard: %d\nEnter: end turn   B: build wall (crew selected)" \
 			% [state.turn + 1, state.crew_aboard]
 
 

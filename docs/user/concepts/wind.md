@@ -38,6 +38,12 @@ Wind shapes every naval decision. A favorable wind direction makes certain route
 
 Wind shifts gradually as the game progresses. A route that is fast with a favorable wind becomes costly when the wind backs against you. Patient sailors plan their positions with the next wind shift in mind.
 
+## Reading the Wind Indicator
+
+The wind indicator in the top-left corner shows an arrow and your ship's remaining movement (`AP: n`). Like a weather vane, the arrow points toward the direction the wind is coming **from**, so a wind from the northwest is shown pointing northwest. The hex the arrow points at is the windward hex: the one your ship cannot sail into. Sailing directly away from the arrow is running, and is the cheapest way to travel.
+
+The ship's movement highlights always take the wind into account, so you can check them against the arrow.
+
 ## Crew on Land
 
 Crew are not affected by wind. They always receive 1 action point per turn regardless of conditions.

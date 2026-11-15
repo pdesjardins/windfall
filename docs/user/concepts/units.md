@@ -49,17 +49,13 @@ To wake an anchored ship, click it.
 
 ---
 
-## Turn Queue
+## Ending Your Turn
 
-At the start of each turn, all units with available moves are placed in a queue. They are selected one at a time, with the camera panning to each unit automatically. You have three ways to manage a unit's place in the queue:
+Move your units, then press **Enter** or click the **End Turn** button in the bottom-right corner. Ending the turn shifts the wind, gives your ship a fresh movement budget, restores one action to each crew member who is free to act, advances wall construction, and updates what you can see.
 
-| Key | Effect |
-|---|---|
-| **Space** | Skip this unit for the rest of the turn |
-| **W** | Wait — move this unit to the end of the queue |
-| **F** | Encamp / Anchor — remove from the queue across all turns |
+You do not have to use every move; end the turn whenever you are ready. The status line at the bottom-left shows the turn number and how many crew are aboard.
 
-When all units have finished their moves, the turn ends automatically after a short pause. You can also end the turn early at any time with the **End Turn** button.
+**Planned:** a turn queue that selects each unit with moves left in turn, with Skip (**Space**), Wait (**W**) and Encamp/Anchor (**F**), and a turn that ends automatically when nothing is left to do. These existed in the earlier browser version and are not yet in this one. See the [Keyboard Reference](../reference/keybindings.md).
 
 ---
 

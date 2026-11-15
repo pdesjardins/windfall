@@ -52,6 +52,8 @@ The player commands *Resolution*. The AI commands *Accord*.
 - All non-ocean, non-mountain hexes are rendered as flat. No elevation differences between land hexes are depicted or acknowledged.
 - The human player and AI player start on opposite sides of the map, far enough apart that early contact requires deliberate exploration.
 
+> **Godot implementation status:** Terrain uses Godot `FastNoiseLite` (simplex fBm for elevation and biome, plus a ridged-fractal mask for mountains). Stone is currently elevation-determined (`elev > 0.30`), not biome-determined as described above, and the volcanic scatter pass is not yet implemented. The development map is 80×50. There is only one (human) starting ship, placed at the first ocean hex found in the left quarter of the map. All world generation, the starting wind, and the per-turn wind shifts derive from a single integer game seed, which is printed to the console at startup.
+
 ### Terrain Types
 
 | Terrain | Navigable By | Notes |
@@ -81,7 +83,9 @@ A ship in irons has the single windward hex blocked but can move freely in all o
 
 The budget model allows mixed-direction moves within a turn (e.g., one broad-reach hex and three running hexes) as long as total cost does not exceed 6. The budget always resets to 6 at the start of each turn regardless of wind direction.
 
-Wind direction is displayed as an SVG wind face in the right panel. Ship heading is stored as a direction index (0–5) and updated on every move. At game start, the ship faces directly downwind (heading = leeward direction = `seed % 6`) to guarantee a full budget on the first turn.
+**Direction convention.** Sailors name wind by where it comes **from**, and the player is always shown that. Internally the game state stores the opposite: `wind_dir` is the direction the wind blows **toward** (the leeward or running direction). Moving along `wind_dir` is cheapest (running); moving along the player-facing "from" direction is blocked (in irons). `GameState.wind_from_dir()` converts. Any display of wind must use the "from" direction.
+
+**Wind indicator.** A small arrow widget (top-left of the screen) points toward the hex direction the wind is coming **from**, like a weather vane facing into the wind, and shows the ship's remaining movement budget beneath it as `AP: n`. (The earlier JS version used an SVG/PNG wind face in the right panel.) Ship heading is stored as a direction index (0–5) and updated on every move. At game start, the ship faces directly downwind (heading = leeward direction = `seed % 6`) to guarantee a full budget on the first turn.
 
 ### Fog of War
 
@@ -99,6 +103,10 @@ Sight ranges:
 - Live wall segment: 1 hex (a crewed fortification maintains watch)
 
 The enemy flag becomes visible only when a player unit is directly adjacent to it (1 hex distance), regardless of general visibility.
+
+**Timing.** Moving a unit reveals hexes immediately. A multi-hex ship move reveals sight range around **every hex along the route**, not only the destination. At end of turn all previously visible hexes drop to explored, then every ship, crew unit, and live wall re-reveals its surroundings.
+
+**Developer toggle.** `Ctrl+Shift+F` shows the whole map and displays a `DEV: FOG OFF` label; press again to restore fog.
 
 ---
 
@@ -140,7 +148,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 
 **Movement budget:** 6 points per turn, always. Cost per hex is determined by the angle to the wind (see Wind section). Running costs 2 pts/hex (3 hexes available), broad reach costs 3 pts/hex (2 hexes), close reach costs 6 pts/hex (1 hex), windward direction is blocked. The End Turn button skips remaining movement.
 
-**Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by forts draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool is defined in `src/js/engine/ships.js` when that module is introduced.
+**Naming:** Starting ships have reserved names: *Resolution* (human) and *Accord* (AI). Ships produced by forts draw names in order from a fixed thematic pool; if the pool is exhausted, they are named "Hull N" (N = sequential integer). The name pool will live in its own module when ship production is introduced.
 
 **Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
@@ -334,13 +342,63 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 1. **Human turn:** The player takes all actions for their units. When satisfied, the player ends their turn.
 2. **AI turn:** The AI takes all actions for its units. When complete, the next human turn begins.
 
+**Ending the turn.** The player ends their turn with the **Enter** key (or numpad Enter) or the **End Turn** button at the bottom-right of the screen. Ending the turn: increments the turn counter, applies the wind shift, resets the ship's movement budget to 6, restores 1 AP to every crew unit that is not building, advances wall construction one stage, re-runs fort detection, and refreshes fog. `Space` is deliberately **not** an end-turn key: in the user documentation it means "skip this unit" (see Implementation Status).
+
 **Action points:** Crew receive 1 AP per turn. Ships receive a movement budget of 6 points per turn; usable distance varies by direction relative to wind (see Wind section).
+
+---
+
+## Controls and Interface
+
+### Selection and Movement
+
+Play is mouse-driven with a few keys. Left-click selects; there is no separate "move" command.
+
+1. **Select** a unit by clicking it: the ship, or a land crew member. A ring appears around the selected unit.
+2. **Destinations are highlighted** in a light tan tint. For the ship these are **every ocean hex reachable this turn**, found by a wind-cost search over the remaining movement budget (so one click can move the ship several hexes). For crew these are the adjacent walkable hexes while the crew has AP.
+3. **The unit's own hex is highlighted the same way** whenever it has any option, because staying put is a legal choice. Clicking the own hex, or any hex that is not a destination, deselects without spending anything.
+4. **Boarding actions are highlighted green.** With the ship selected and crew aboard, adjacent land hexes where a crew member can disembark are green; clicking one lands one crew member and keeps the ship selected so more can follow. With a crew member selected next to their ship, the ship's hex is green; clicking it embarks the crew. After a crew move that ends next to the ship, the crew stays selected so embarking is one more click.
+5. **A spent unit shows no destinations.** A ship with no budget or a crew member with 0 AP shows only the selection ring.
+6. Crew that are building a wall cannot be selected, and no other crew may step onto a hex where a wall is under construction.
+
+### Keys and Mouse
+
+| Input | Action |
+|---|---|
+| Left-click | Select a unit / choose a highlighted destination |
+| `Enter` / numpad `Enter` | End the turn |
+| End Turn button | End the turn |
+| `B` | With a crew unit selected, start building a wall on its hex immediately (no menu) |
+| Right-drag | Pan the camera |
+| Mouse wheel | Zoom (0.25× to 3×); the camera is clamped to the map |
+| `Ctrl+Shift+F` | Toggle fog of war (developer) |
+
+### Heads-Up Display
+
+- **Wind indicator** (top-left): arrow pointing at the direction the wind comes from, with the ship's remaining movement budget (`AP: n`).
+- **Status line** (bottom-left): current turn number, crew aboard the ship, and key hints.
+- **End Turn button** (bottom-right). It never takes keyboard focus, so key presses always reach the game.
+
+---
+
+## Implementation Status (Godot Port)
+
+The behavior above this section is specified for the finished game. As of 2026-11-14 the Godot port implements: map generation, fog of war, ship movement under wind, crew disembark/embark/movement, wall construction and fort detection, and the controls above. Not yet ported or built:
+
+| Feature | State |
+|---|---|
+| Turn queue, auto-select, auto-end of turn, Skip (`Space`), Wait (`W`), Encamp/Anchor (`F`), Unload (`U`) | Existed in the JS version; not ported. Until the queue exists, crew and ship are selected by clicking and the player ends the turn manually. |
+| Save and resume | Existed in the JS version; not ported |
+| Farms and logging camps | Existed in the JS version; not ported |
+| Volcanic scatter terrain pass, opposite-side starting positions | Specified; not implemented |
+| Flags, win/loss, AI opponent, combat, ship/crew production, wall HP | Specified; not implemented in either version |
+| On-screen text panels and localization | JS had them; Godot has only the HUD above |
 
 ---
 
 ## Save and Resume
 
-**Saving:** The player may save at any time during their turn. The game state serializes to a JSON file downloaded to the player's device as `windfall-save.json`.
+**Saving:** The player may save at any time during their turn. The game state serializes to a JSON file (`windfall-save.json`). In the original browser version it downloaded to the player's device; in the Godot port it will be written through a file dialog. The seed, turn count, and unit/improvement state are sufficient to rebuild terrain and wind.
 
 **Loading:** On the main page, the player may load a save file. The game restores to the exact state at the time of saving.
 
@@ -406,3 +464,12 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 | 2026-10-17 | Embark and disembark are free actions (0 AP) | Charging 1 AP made the embark/disembark cycle feel like a tax on positioning rather than a meaningful decision; free embark lets players focus on crew placement and construction |
 | 2026-10-17 | Live wall segments reveal fog of war (sight range 1) | A crewed fortification maintains watch over adjacent terrain; consistent with treating forts as defended positions rather than inert structures |
 | 2026-10-17 | Wall construction stages shown visually | Dashed outline at WALL_1 and semi-opaque fill at WALL_2 provide feedback that a crew unit is actively building; invisible progress left the interaction opaque |
+| 2026-11-14 | Player-facing wind direction is where it comes FROM; internal `wind_dir` is where it blows TOWARD | Sailors name wind by its source and would reject an arrow pointing downwind. The rules code already treated `wind_dir` as the leeward direction, so the display converts via `wind_from_dir()` rather than changing the rules. |
+| 2026-11-14 | One game seed drives terrain, starting wind, and wind shifts | Wind and map previously drew separate random seeds, so a saved game could not recover its wind sequence from seed + turn as the spec requires. |
+| 2026-11-14 | Wind shift table restored to 20/30/30/7/7/3/3 | The Godot port had copied the pre-2026-04-26 table (40% no change). |
+| 2026-11-14 | A crew member who completes a wall regains their AP on the turn it completes | Previously they sat idle one extra turn; the JS engine restored AP on completion. |
+| 2026-11-14 | No crew may enter a hex where a wall is under construction | Enforces "one builder per hex" for stacking-friendly friendly crew movement. |
+| 2026-11-14 | Ship fog reveal covers the whole route of a multi-hex move | One click now moves several hexes; revealing only the destination skipped terrain the ship sailed past. |
+| 2026-11-14 | Enter and an on-screen End Turn button end the turn; `Space` does not | `Space` means "skip unit" in the documented queue controls. Manual ending is a stopgap until the turn queue and auto-end are ported. |
+| 2026-11-14 | Selected unit's own hex is highlighted like a destination | Not moving is a valid option; leaving the hex unhighlighted made the options look inconsistent. |
+| 2026-11-14 | Game rules extracted into scene-free `GameState` (with `HexGrid`, `CrewData`) | Makes rules testable headless and keeps `Main` to rendering and input; groundwork for save/load and the AI. |

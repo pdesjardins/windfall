@@ -24,8 +24,9 @@ docs/
     concepts/                    ← what things are and how they work
     reference/                   ← complete mechanic and rule reference
     guides/                      ← task-oriented how-to guides
-src/                             ← application source code (HTML, JS, CSS)
-tests/                           ← all test suites
+godot/                           ← the game (Godot 4.7 / GDScript): rules, scenes, tiles, sprites
+  tests/                         ← headless tests: godot --headless --script tests/run.gd
+src/, tests/                     ← retired HTML/JS implementation (on main; reference only)
 .github/workflows/               ← CI configuration
 ```
 

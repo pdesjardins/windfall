@@ -3,63 +3,62 @@
 
 ## System Summary
 
-Windfall is a client-side-only web application. There is no server, no backend, and no network communication during gameplay. The game runs entirely in the browser from static HTML, CSS, and JavaScript files.
+Windfall is a desktop game built with **Godot 4.7 and GDScript 4** (GL Compatibility renderer). There is no server and no network communication. The original browser/JS implementation (on `main`) is superseded; its design documents remain the source of truth for rules that are not yet ported (see the Implementation Status section of the product spec).
 
-The application has two major layers:
+The code has two layers:
 
-- **Engine** — pure game logic with no DOM dependencies. Deterministic, testable in Node.js.
-- **UI** — rendering and input handling. Depends on engine. Not independently testable.
+- **Rules** (`GameState` and the classes it uses) — pure game logic with no dependency on the scene tree. Deterministic from a seed. Tested headless.
+- **Presentation** (`Main` and the marker/overlay nodes) — draws a `GameState`, turns input into calls on it, and re-renders. Not independently testable.
 
-Engine modules must not import from UI modules. This boundary is enforced by linting.
+Rules code must not reference nodes, `TileMapLayer`, or any scene-tree API. This is why `HexGrid` exists: neighbor lookups would otherwise need a tile layer.
 
 ---
 
 ## Module Map
 
 ```
-src/
-  index.html              ← entry point; loads all modules
-  css/
-    main.css              ← layout and global styles
-    game.css              ← game canvas, HUD, and side panel styles
-  js/
-    main.js               ← game loop, click handling, selection state machine, auto-turn logic, wind display
-    engine/
-      hex.js              ← hex grid math (coordinates, neighbors, distance)
-      terrain.js          ← procedural terrain generation and water flooding
-      fog.js              ← fog of war: undiscovered / explored / visible state per hex
-      wind.js             ← wind direction, point-of-sail AP, shift model (pure functions, no DOM)
-      game.js             ← game state, unit actions, turn management
-    ui/
-      renderer.js         ← canvas rendering: terrain, fog, ships, crew, selection highlights
+godot/
+  project.godot, node_2d.tscn      ← project settings; main scene (World layers, UI, Camera2D)
+  GameState.gd                     ← ALL game rules and state (RefCounted, no scene dependency)
+  HexGrid.gd                       ← pure hex math: neighbors in tile-layer order
+  Wind.gd                          ← wind shift model and point-of-sail costs (static functions)
+  Fog.gd                           ← per-hex undiscovered / explored / visible state
+  CrewData.gd                      ← one crew unit's state (position, AP, building status)
+  Main.gd                          ← presentation: owns a GameState, renders, handles input, HUD
+  CrewMarker.gd, ShipMarker.gd     ← sprites; CrewMarker holds a CrewData reference
+  SelectionOverlay.gd              ← draws selection ring and destination highlights
+  FortLines.gd                     ← draws lines between adjacent live walls
+  WindIndicator.gd                 ← wind arrow and AP readout widget
+  CameraController.gd              ← right-drag pan, wheel zoom, clamped to the map
+  tiles/*.svg, sprites/*.svg       ← terrain, improvement, fog tiles and unit sprites
+  tests/                           ← headless test runner and tests (see testing standard)
 ```
 
-Modules listed without a file do not yet exist. They will be added in future sprints as the features they serve are implemented.
+`GameState` owns: terrain, improvements, live walls, fog, wind direction, turn counter, the ship (position, heading, remaining budget, crew aboard), and the list of crew on land. Its public surface is the rules: `ship_move_costs()`, `move_ship()`, `disembark_targets()`, `disembark()`, `crew_targets()`, `move_crew()`, `can_embark()`, `embark()`, `can_build()`, `start_build()`, `end_turn()`, `detect_forts()`, `wind_from_dir()`. `Main` never edits state directly; it calls these and re-renders.
+
+**Rendering layers** (all `TileMapLayer`, bottom to top): terrain, improvements (wall stages), fog; then `Units` (sprites), fort lines, selection overlay. The UI is a `CanvasLayer`.
 
 ---
 
 ## Hex Grid
 
-Windfall uses **even-q offset coordinates** (column, row) on a flat-top hex grid. Even columns are not vertically shifted; odd columns shift down by half a hex height. This is the coordinate system used for terrain storage, fog arrays, and all `{q, r}` position objects throughout the codebase.
+Windfall uses Godot's `TILE_SHAPE_HEXAGON`, `TILE_LAYOUT_STACKED`, vertical offset axis: **flat-top hexes in columns; even columns are not shifted, odd columns are shifted down half a hex** (even-q offset). Cells are `Vector2i(column, row)` everywhere. Tile size is 72×62 px.
 
-**Canonical reference:** [redblobgames.com/grids/hexagons](https://www.redblobgames.com/grids/hexagons/) — all hex math must follow this reference. Do not invent alternative representations.
+`HexGrid.neighbors(cell)` returns the six neighbors in the exact order of `TileMapLayer.get_surrounding_cells()` (a test enforces this). That order **is** the direction index:
 
-**Map dimensions:** 300 columns × 200 rows (60,000 hexes). Exact dimensions are configurable constants in `hex.js`. Viewport culling ensures only visible hexes are rendered each frame.
-
-**Internal hex math:** `hex.js` stores direction vectors as axial deltas (`DIRECTIONS`) and converts to/from axial internally when computing neighbors and distances. Callers always work in even-q offset coordinates — the conversion is transparent. Do not apply `DIRECTIONS` deltas directly to offset coordinates; always use `neighbor()` or `neighbors()`.
-
-**Direction index table** (axial deltas used internally; visual angles computed from actual offset neighbors):
 ```
-Index   Axial Δq  Axial Δr   Visual direction
-  0       +1        -1        NE (upper-right)
-  1       +1         0        SE (lower-right)
-  2        0        +1        S  (straight down)
-  3       -1        +1        SW (lower-left)
-  4       -1         0        NW (upper-left)
-  5        0        -1        N  (straight up)
+Index   Direction
+  0     down-right (SE)
+  1     down       (S)
+  2     down-left  (SW)
+  3     up-left    (NW)
+  4     up         (N)
+  5     up-right   (NE)
 ```
 
-**Coordinate storage:** all hex coordinates are stored as `{q, r}` objects. Do not use arrays `[q, r]` — objects are more readable in save files and debug output.
+Opposite directions are always `index` and `(index + 3) % 6`; the wind code depends on it. Note this index order differs from the JS version's (0 = NE, 1 = SE, 2 = S …). A seed therefore produces a different starting compass direction than in JS, and any future save importer must not assume the JS numbering.
+
+**Map dimensions:** 80×50 in development; the design target is 300×200. Rendering loops currently visit every cell on each update, which is fine at 4,000 cells but must become change-tracking before the map grows.
 
 ---
 
@@ -71,7 +70,9 @@ Terrain is generated procedurally at game start from two independent seeded nois
 
 Elevation is used only during terrain classification. It is discarded afterward — no hex carries an elevation value into gameplay or rendering.
 
-Generation uses **ridged multifractal noise** (value noise with a ridge transform applied per octave). This produces sharp mountain ridges, island silhouettes, and inland lake basins rather than the rolling hills of standard fractal noise.
+Generation uses three `FastNoiseLite` fields seeded from the game seed (`seed`, `seed + 1000`, `seed + 2000`): simplex fBm for elevation (frequency 0.04, 4 octaves), simplex fBm for biome (0.06, 3 octaves), and a ridged-fractal field (0.035, 4 octaves) used as a mountain mask. Thresholds are constants in `GameState`.
+
+**Current classification (differs from the spec's intent):** ocean if `elev < 0.05`; mountain if `elev > 0.30` and `ridge > 0.52`; stone if `elev > 0.30`; otherwise forest if `biome > 0`, else grassland. Stone is therefore elevation-determined here rather than biome-determined, and the volcanic scatter pass below is **not yet implemented**.
 
 Classification applies two thresholds in order:
 
@@ -105,59 +106,52 @@ Every hex has one of three visibility states, tracked per player:
 | `explored` | Greyed, static | Previously seen; shows last-known state |
 | `visible` | Full color, live | Currently within sight range of a unit |
 
-Visibility is recalculated each turn after all unit moves.
+Moves reveal immediately (a ship move reveals along its whole route); `Fog.end_turn()` demotes visible to explored, then `GameState.end_turn()` re-reveals around the ship, every crew unit, and every live wall.
 
 **Sight ranges:**
 - Ship: 3 hexes (elevated mast)
-- Crew on land: 2 hexes
+- Crew on land: 1 hex
+- Live wall segment: 1 hex
 
 The enemy flag becomes visible when a player crew unit is directly adjacent to it (1 hex).
 
-**Rendering:** The starfield background is clipped to explored and visible hexes only. Undiscovered hexes and the area outside the map boundary render as solid black. Players discover the space scene by exploring to the map edge.
+**Rendering:** undiscovered hexes use an opaque black fog tile; explored hexes use a translucent dim tile; visible hexes have no fog tile. (The JS starfield edge effect is not ported.)
 
-**Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears on the canvas when active. This toggle is available at all times for design and testing work.
+**Development toggle:** `Ctrl+Shift+F` disables fog rendering, treating all hexes as visible. A `DEV: FOG OFF` label appears when active. This toggle is available at all times for design and testing work.
+
+---
 
 ## Unit State
 
-### Ships Array
+### Ship
 
-`game.ships` is an array of ship objects. Each ship carries:
+Held directly on `GameState` (a single ship; multiple ships arrive with production):
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | number | Stable identity assigned at creation; never reused |
-| `q`, `r` | number | Current hex position |
-| `direction` | 0–5 | Heading as a direction index; updated on every move; initialized to `seed % 6` (downwind) at game start |
-| `owner` | `'human'` \| `'ai'` | Controlling faction; flips on capture |
-| `ap` | number | Movement budget this turn; always reset to `SHIP_MOVE_BUDGET` (6) by `endPlayerTurn`; each hex move deducts `moveApCost(windDir, dirIndex)` |
-| `sleeping` | boolean | When `true`, the ship is anchored — excluded from the turn queue until the player explicitly clicks it |
+| Field | Description |
+|---|---|
+| `ship_pos` | Current cell |
+| `ship_direction` | Heading as a direction index (0–5); updated by every step of every move; initialized to the starting `wind_dir` (downwind) |
+| `ship_budget` | Movement points left this turn; reset to 6 by `end_turn()`; each hex deducts `Wind.move_cost()` |
+| `crew_aboard` | Crew count aboard (capacity 10); individual aboard crew are not tracked |
 
-A ship with no reachable move targets is rendered at 35% opacity. A sleeping ship is rendered at 50% opacity. A ship in irons (`pointOfSail === 0`) has the windward hex blocked but can still move in all other directions. A ship with 0 crew aboard is inert — `moveShip` returns null regardless of budget.
+`ship_move_costs()` runs a cost-bounded search over ocean cells using the wind-dependent per-step cost and returns every reachable cell with its total cost. `move_ship(target)` re-runs the search, deducts the cost, walks the cheapest route revealing fog at each hex, and sets the heading from the last step. Wind-blocked steps (cost `Wind.BLOCKED`) are never taken.
 
-Ships are capturable: enemy crew boarding an uncrewed ship flips `owner` to the boarding faction.
+### Crew (`CrewData`)
 
-`game.nextShipId` is a monotonically increasing integer used to assign stable IDs when new ships are created (e.g. via fort production).
+Each crew unit on land is a `CrewData`:
 
-### Crew
+| Field | Description |
+|---|---|
+| `map_pos` | Current cell |
+| `ap_remaining` | Actions left this turn; `CREW_AP_BUDGET` (1) restored by `end_turn()` unless building |
+| `building` | `true` while constructing a wall |
+| `build_pos` | The hex under construction |
 
-Each crew unit carries:
+Embarking and disembarking cost no AP. A building crew has 0 AP, cannot move, and is not selectable. When its wall completes it is freed and regains full AP that same turn. No other crew may enter a hex under construction. `CrewMarker` is a sprite holding a reference to its `CrewData`; `Main` keeps marker position in sync.
 
-| Field | Type | Description |
-|---|---|---|
-| `id` | number | Stable identity (0-indexed) |
-| `aboard` | boolean | `true` = on ship; `false` = on land |
-| `shipId` | number \| null | ID of the ship this crew member is aboard; `null` when on land |
-| `q`, `r` | number \| null | Position when on land; `null` when aboard |
-| `ap` | number | Action points remaining this turn; reset to `CREW_AP` (1) on `endPlayerTurn` |
-| `sleeping` | boolean | When `true`, the crew is encamped — excluded from the turn queue until the player explicitly clicks them |
+The JS fields `sleeping`, `shipId`, and `aboard` do not exist in the port; they return with the turn queue (encamp/anchor/unload) and multiple ships.
 
-Crew with `ap === 0` are rendered at 35% opacity. Sleeping crew are rendered at 50% opacity.
-
-**Aboard crew** start each turn `sleeping: true` (auto-anchored). They cannot disembark until the player issues a **U — Unload** command on the ship, which calls `unloadCrew` to wake all sleeping crew aboard. At turn end, `endPlayerTurn` re-sleeps all aboard crew. This ensures the player explicitly chooses when to put crew ashore rather than having them automatically eligible every turn.
-
-Aboard crew contribute to the ship's crew count. Their AP can be spent on disembarking (1 AP). The mechanical disembark action does not consume ship AP.
-
-**Land crew** move independently on land hexes (not ocean, not mountain). Each move costs 1 AP. Moving onto the ship's hex embarks the crew (1 AP).
+---
 
 ---
 
@@ -167,11 +161,11 @@ Wind is a global direction (0–5, matching the hex direction index table) that 
 
 ### Wind State
 
-`game.wind = { dir }` — a single integer. No accumulated rotation is stored; the current direction is the only state needed. The shift is computed fresh each turn from `windShift(seed, turn)`, making wind fully reproducible from seed + turn count without additional save-file fields.
+`GameState.wind_dir` — a single integer 0–5, the direction the wind blows **toward** (leeward/running). The starting value is `seed % 6` and the shift is computed fresh each turn from `Wind.wind_shift(seed, turn)`, making wind fully reproducible from the one game seed + turn count. `wind_from_dir()` returns the opposite (windward) direction, which is what the player is shown and what is blocked to the ship.
 
 ### Movement Budget
 
-The ship receives `SHIP_MOVE_BUDGET = 6` movement points each turn. Each step costs `moveApCost(windDir, dirIndex)` points, which is `SHIP_MOVE_BUDGET / POINT_OF_SAIL_AP[pos]`:
+The ship receives `SHIP_MOVE_BUDGET = 6` movement points each turn. Each step costs `Wind.move_cost(wind_dir, dir_index)` points, from the table `Wind.AP_COSTS` indexed by point of sail:
 
 | Point of Sail | Steps from windward | Cost per hex | Max hexes from budget |
 |---|---|---|---|
@@ -180,46 +174,46 @@ The ship receives `SHIP_MOVE_BUDGET = 6` movement points each turn. Each step co
 | Broad reach | 2 — heading mostly with wind | 3 | 2 |
 | Running | 3 — heading directly with wind | 2 | 3 |
 
-"Steps from windward" is the minimum hex-direction angular distance between the move direction and the windward direction (opposite of `wind.dir`). Implemented in `wind.js` as `pointOfSail(windDir, moveDir)`.
+"Steps from windward" is the minimum hex-direction angular distance between the move direction and the windward direction (opposite of `wind_dir`). Implemented as `Wind.point_of_sail(wind_dir, move_dir)`.
 
-The cost model means a player can mix directions within a turn — for example, spend 3 pts on one broad-reach hex and 3 pts on a second broad-reach hex — as long as the total does not exceed the budget. `moveShip` deducts the exact cost of each step; the UI computes reachable hexes via Dijkstra weighted by `moveApCost`.
+The cost model means a player can mix directions within a turn — for example, spend 3 pts on one broad-reach hex and 3 pts on a second broad-reach hex — as long as the total does not exceed the budget. `GameState.move_ship` deducts the exact total cost; `ship_move_costs()` finds reachable hexes with a search weighted by the per-step cost.
 
 ### Shift Model
 
-At the start of each new turn (after `game.turn` increments), `windShift(seed, turn)` returns a facet delta drawn from:
+At the start of each new turn (after `game.turn` increments), `Wind.wind_shift(seed, turn)` returns a facet delta drawn from:
 
 | Shift | Probability |
 |---|---|
-| 0 | 40% |
-| ±1 | 25% each |
-| ±2 | 4% each |
-| ±3 | 1% each |
+| 0 | 20% |
+| ±1 | 30% each |
+| ±2 | 7% each |
+| ±3 | 3% each |
 
-The hash function `windRng(seed, turn)` is a fast integer hash (not cryptographic). The same seed and turn always produce the same wind, ensuring reproducibility.
+The hash function `Wind._wind_rng(seed, turn)` is a fast integer hash (not cryptographic). The same seed and turn always produce the same wind, ensuring reproducibility.
 
 ### Wind Display
 
-A PNG wind face (`src/assets/windhead.png` — antique cartographic style, black lines on transparent background) sits in the right panel. A CSS filter (`invert(1) sepia(0.45) brightness(0.9)`) warms the black lines to match the parchment palette. Its `transform: rotate(Xdeg)` is updated by `main.js` whenever wind changes. The angle lookup `WIND_CSS_ANGLE = [240, 300, 0, 60, 120, 180]` maps `wind.dir` to the CSS rotation that points the plumes toward the leeward direction (calibrated for windhead.png's natural orientation: plumes point south at 0°). `WIND_NAMES = ['SW', 'NW', 'N', 'NE', 'SE', 'S']` gives the standard from-direction name for each `wind.dir` index.
+`WindIndicator` draws an arrow and the `AP: n` readout, anchored top-left in the UI layer. `Main` computes the arrow angle from the screen position of the neighbor in direction `wind_from_dir()`, so the arrow points at the wind's source like a weather vane. Using screen angles from real neighbor positions (rather than fixed angles per index) keeps it correct for the hex layout.
 
 ---
 
 ## Turn Structure
 
-Each player turn proceeds as follows:
+The player acts in any order, then ends the turn with **Enter** or the End Turn button (both call `Main._end_turn()` → `GameState.end_turn()`). `Space` is intentionally unbound for ending turns; it is reserved for Skip when the queue returns.
 
-1. **Turn start** — `endPlayerTurn` has just been called: visible hexes transition to explored, turn counter increments, wind shifts (`windShift(seed, turn)`), ship AP resets to `SHIP_MOVE_BUDGET`, crew AP resets to `CREW_AP`.
-2. **Unit queue built** — `buildTurnQueue()` produces an ordered `pendingUnits` array of `{ type, id }` descriptors. Ships come first (sorted by id), then land crew (sorted by id). Units are included only if they have remaining moves and are not sleeping.
-3. **Auto-select** — the first unit in `pendingUnits` is selected and the camera pans to it. Move targets are highlighted.
-4. **Player actions** — any order: move ship (costs ship AP; windward hex blocked), move crew on land (1 AP/hex), disembark crew (1 crew AP), embark crew (1 crew AP). After each action, if the active unit is exhausted it is removed from the queue; after a 250 ms pause the next queued unit is auto-selected with a smooth 350 ms animated camera pan.
-5. **Queue controls:**
-   - **Space** — skip the selected unit for this turn (removed from queue; does not return until next turn).
-   - **W** — wait (defer the selected unit to the end of the queue; other units act first).
-   - **F** — encamp/anchor (set `sleeping = true`; unit is removed from the queue permanently until the player clicks it to wake it).
-   - Clicking a sleeping unit wakes it (`sleeping = false`) and inserts it at the front of the queue if it has moves.
-6. **Auto-end detection** — when `pendingUnits` is empty, a brief "All moves spent…" message appears and the turn ends automatically after 800 ms. The player may end the turn early at any time by clicking End Turn.
-7. **Mid-turn queue updates** — `afterAction()` scans for units that became eligible during the turn (e.g. crew just disembarked) and appends them to `pendingUnits`.
+`GameState.end_turn()`, in order:
 
-**Fog timing:** `moveShip` and `moveCrew` call `setVisible` immediately, accumulating revealed hexes during the turn. The visible→explored sweep runs only in `endPlayerTurn`, so players see the full extent of their moves before the fog dims.
+1. Increment `turn`; apply `Wind.wind_shift(seed, turn)` to `wind_dir`.
+2. Reset `ship_budget` to `SHIP_MOVE_BUDGET` (6).
+3. For each crew: if not building, restore AP; if building, advance the hex `WALL_1 → WALL_2 → WALL`, and on completion clear `building` and restore AP.
+4. Re-run `detect_forts()`.
+5. Fog: visible → explored, then re-reveal around the ship, each crew unit, and each live wall.
+
+`Main` then clears the selection and re-renders improvements, fort lines, fog, and the HUD.
+
+**Not yet ported from the JS design:** the `pendingUnits` turn queue with auto-select and camera pan, Skip/Wait/Encamp/Anchor/Unload, and automatic turn end when no unit has options. They are specified in the user docs as planned behavior. When added, queue logic belongs in `GameState` (which units are eligible) with only selection and camera motion in `Main`.
+
+---
 
 ---
 
@@ -231,7 +225,7 @@ Forts are built wall segment by wall segment and go live when the wall forms a c
 
 **Wall construction:** A crew unit spends 3 turns on a grassland, forest, or stone hex to convert it to a wall improvement. Each turn advances the hex through intermediate states `IMPROVEMENT_WALL_1` → `IMPROVEMENT_WALL_2` → `IMPROVEMENT_WALL`. The renderer draws each stage distinctly (foundation only; foundation + 2 outer merlons; complete 3-merlon wall) at increasing opacity so construction progress is visible on the map.
 
-**Live detection:** After each wall placement, the game checks whether the new wall hex completes a closed loop — a contiguous chain of wall hexes and/or mountain hexes connected back to itself. When a closed loop is detected, the hexes enclosed by the loop become the live fort interior.
+**Live detection:** At the end of each turn (`GameState.end_turn()` → `detect_forts()`), the game checks whether completed walls form a closed loop — a contiguous chain of wall hexes and/or mountain hexes connected back to itself. When a closed loop is detected, the hexes enclosed by the loop become the live fort interior.
 
 **Embarkation:** Crew may embark and disembark across the boundary between a coast hex and an adjacent friendly wall hex (gates assumed). Enemy wall hexes block disembarkation and trigger cannon fire.
 
@@ -289,68 +283,44 @@ AI sophistication is intentionally limited in the initial implementation. The AI
 
 ## Graphics and Assets
 
-**Terrain hexes — canvas-drawn icons (current)**
-Each terrain type is rendered as a flat color fill with a small sparse icon drawn on top in `renderer.js`. Icons use thin strokes or small fills at roughly 50–70% opacity so they read as a signal without dominating the hex color. All drawing is done in the existing canvas render loop with no external assets.
+Terrain, improvement, and fog hexes are **SVG tiles** in `godot/tiles/`, imported as `Texture2D` and built into a `TileSet` at runtime (`Main._make_hex_tileset`), one atlas source per tile. Ship and crew are SVG sprites in `godot/sprites/`. Swapping those files re-skins the game with no code change.
 
-| Terrain | Icon |
-|---|---|
-| Ocean | S-curve wave (rotated 10° CCW to read horizontal) |
-| Grassland | 2–3 wheat stalks with grain-tip ticks (rotated 5° CCW) |
-| Forest | Single conifer triangle (centered, uniform across all forest hexes) |
-| Stone | Three staggered masonry bricks (two bottom, one centered on top) |
-| Mountain | Two-peak silhouette: small foreground peak (left) occludes the left leg of the large background peak |
+Unit sprites are rotated to face their direction of travel; the ship's rotation is the screen angle of its `ship_direction` neighbor. Selection highlights (`SelectionOverlay`) are drawn as translucent hex polygons: tan for destinations (including the unit's own hex), green for boarding moves, plus a ring on the selected unit. Live fort walls are connected by `FortLines`.
 
-Icons are drawn before the fog overlay so explored hexes show dimmed versions. Position is seeded by `(q * 31 + r * 17) | 0` for stable per-hex variation without per-frame random calls.
-
-**Terrain hexes — SVG (planned)**
-The long-term target is a dedicated SVG file per terrain type, loaded at startup, rasterized to an offscreen canvas at the current hex size, and cached. Resizing triggers a re-rasterization pass. This approach makes terrain skins swappable without code changes. Not yet implemented — the canvas-drawn icons are the current shipping state.
-
-**Sprites — PNG (planned)**
-Crew, ships, and flags are intended as PNG sprites in `src/assets/sprites/`. Currently rendered as canvas-drawn shapes directly in `renderer.js`. No external sprite assets exist yet.
-
-**Skinning**
-When SVG terrain and PNG sprites are implemented, swapping all assets constitutes a complete visual skin with no code changes required.
+---
 
 ---
 
 ## Localization
 
-All user-visible strings are externalized to `src/js/locale/en.js`. No raw string literals appear in UI code. The active locale module is loaded at initialization and injected into UI modules.
+**Not implemented in the Godot port.** The JS version externalized strings (`en.js`) but only partly used it. The port's few UI strings (HUD, button, dev label) are literals in `Main.gd`. If localization is wanted, use Godot's `tr()` and translation resources rather than reviving the JS locale module; decide before the UI grows.
 
-The project is localization-ready but ships only in English. Adding a language requires creating a new locale module and a language-selection mechanism — neither is implemented currently.
-
-**RTL layout:** All CSS uses logical properties (`margin-inline-start`, `padding-inline-end`, etc.) rather than physical directional properties. The `dir` attribute on `<html>` controls layout direction. Canvas-rendered text is not covered by this mechanism and must be handled separately if RTL canvas text is required.
-
-**Number formatting:** `Intl.NumberFormat` is not currently used. All numbers in the game are small integers (turn counter, unit counts, production countdowns) passed through locale module functions. If locale-appropriate number formatting is needed in future, it can be added in one place within the locale module without changes elsewhere in the codebase.
+---
 
 ---
 
 ## Input Model
 
-The game is primarily mouse-driven. The canvas element handles clicks and drag-to-pan. Keyboard shortcuts supplement the mouse for queue management.
-
-### Controls
+`Main._unhandled_input` handles keys and left-click; `CameraController` handles right-drag pan and wheel zoom. A left-click counts only if the pointer moved less than 4 px between press and release, so it never fires at the end of a drag. The End Turn button is a normal `Button` with `focus_mode = FOCUS_NONE` so it never swallows key presses.
 
 | Input | Action |
 |---|---|
-| Click unit | Select (or wake if sleeping and insert into queue) |
-| Click highlighted hex | Move selected unit |
-| Click and drag | Pan the map |
-| `Space` | Skip selected unit for this turn |
-| `W` | Wait — defer selected unit to end of queue |
-| `F` | Encamp / Anchor — sleep selected unit until explicitly woken |
-| `U` | Unload — wake all sleeping crew aboard the selected ship (only actionable when ship is adjacent to land) |
-| `Ctrl+Shift+F` | Toggle fog of war off/on (dev mode) |
+| Click unit | Select |
+| Click highlighted hex | Move / disembark / embark |
+| `Enter`, numpad `Enter`, End Turn button | End turn |
+| `B` | Start a wall with the selected crew |
+| Right-drag, wheel | Pan, zoom |
+| `Ctrl+Shift+F` | Toggle fog (dev) |
 
-The full reference is in `docs/user/reference/keybindings.md`.
+The user-facing reference is `docs/user/reference/keybindings.md`.
 
-Key binding configuration (`src/js/settings.js`) and cursor-based hex navigation are described in earlier architecture drafts but have not been implemented. The cursor navigation model was superseded by click-to-move before Sprint 2.
+---
 
 ---
 
 ## Save File Format
 
-Game state serializes to a single JSON object downloaded as `windfall-save.json`.
+**Not implemented in the Godot port; the schema below is the JS-era design.** Game state serializes to a single JSON object (`windfall-save.json`). Because all randomness derives from one `game_seed`, terrain and wind need only the seed and turn count; only mutable state (units, improvements, fog, flags) needs storing. Hex direction indices differ from JS (see Hex Grid).
 
 ```json
 {
@@ -423,3 +393,7 @@ Full schema definition will be added in the Sprint 1 save/load execution plan. T
 | 2026-04-24 | Wall construction takes 3 turns (not 5) | 5 turns was the original spec; 3 turns was preferred after considering the 1-AP-per-turn crew rhythm. 3 turns creates meaningful investment without being punishing in a game where crew often have limited turns ashore. |
 | 2026-04-24 | Wall construction state lives on the hex (WALL_1/WALL_2 improvement values), not on the crew | A partially-built wall belongs to the location, not the builder. Any crew member can continue work across separate turns. Whether progress is lost when the crew leaves is still an open mechanic (see backlog). |
 | 2026-04-24 | PNG wind face (`windhead.png`) replaces hand-coded SVG | SVG approach produced an unrecognizable face. Player-provided PNG is high quality and the correct aesthetic. CSS filter handles palette matching without editing the asset. |
+| 2026-11-14 | Port to Godot 4.7; rules in scene-free `GameState` | Headless-testable rules; `Main` limited to presentation and input |
+| 2026-11-14 | Own `HexGrid.neighbors` matching `get_surrounding_cells()` order | Rules code must not depend on a `TileMapLayer`; a test pins the two together |
+| 2026-11-14 | Single `game_seed` for terrain, starting wind, and wind shifts | Wind and world must be recoverable from seed + turn for save/load |
+| 2026-11-14 | Plain GDScript test runner instead of GUT | CLAUDE.md prohibits third-party addons without approval |
