@@ -18,9 +18,10 @@ Every hex on the map has one of three visibility states at any moment.
 Your units reveal hexes within their sight range. Sight range is measured in hexes.
 
 - **Ships** reveal hexes within 3 hexes. A ship's mast provides height, allowing the crew to see further across open water.
-- **Crew on land** reveal hexes within 2 hexes.
+- **Crew on land** reveal hexes within 1 hex. Exploring on foot means walking the terrain.
+- **Live fort walls** reveal hexes within 1 hex. A fortification keeps watch over the ground next to it.
 
-Visibility accumulates as you move. Each time a unit moves, the hexes it can see immediately become visible. At the end of your turn — when you press Pass or the game auto-ends — previously visible hexes outside the current sight ranges of all units transition to explored.
+Visibility accumulates as you move. Each time a unit moves, the hexes it can see immediately become visible; when a ship sails several hexes in one move, every hex along the route reveals what is around it. At the end of your turn, previously visible hexes outside the current sight ranges of all units transition to explored.
 
 ## Finding the Enemy Flag
 

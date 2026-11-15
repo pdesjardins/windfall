@@ -8,9 +8,6 @@ Canonical terms used throughout Windfall documentation. When a term is introduce
 **action points**
 The number of actions a unit may take in a single turn. Each movement or build action costs action points. When a unit's action points are exhausted, it may take no further actions until the next turn.
 
-**coast**
-A water hex adjacent to land. Ships navigate coast hexes. Crew cross the boundary between a coast hex and an adjacent land hex to board or leave a ship. Coast hexes cannot be improved. See [Terrain Types](terrain-types.md).
-
 **crew**
 A land-based unit commanded by the player. All crew are identical in capability. Crew can move on land, sail ships, build walls, improve terrain, fight enemy crew, and carry the flag. See [Crew and Ships](../concepts/units.md).
 
@@ -52,7 +49,7 @@ An open water terrain type navigable by ships. Crew cannot enter ocean hexes dir
 A naval unit. All ships are identical in capability and retain full functionality until destroyed. Ships transport crew and fire cannons. See [Crew and Ships](../concepts/units.md).
 
 **sight range**
-The number of hexes around a unit within which terrain and units are visible. Ships have a sight range of 3 hexes. Crew on land have a sight range of 2 hexes. See [Fog of War](../concepts/fog-of-war.md).
+The number of hexes around a unit within which terrain and units are visible. Ships have a sight range of 3 hexes. Crew on land and live fort walls have a sight range of 1 hex. See [Fog of War](../concepts/fog-of-war.md).
 
 **stone**
 A rocky terrain type that crew can enter. Stone hexes near or inside a fort provide a defensive bonus. See [Terrain Types](terrain-types.md).
@@ -67,7 +64,7 @@ A fog of war state. A hex is undiscovered if no player unit has ever had it in s
 A fog of war state. A hex is visible if at least one player unit currently has it within sight range. Visible hexes show their current live state in full color. See [Fog of War](../concepts/fog-of-war.md).
 
 **shore-adjacent**
-A land hex that has at least one coast hex as a neighbor. Shore-adjacent wall hexes enable a fort to produce ships and allow crew to embark and disembark.
+A land hex that has at least one ocean hex as a neighbor. Shore-adjacent wall hexes enable a fort to produce ships and allow crew to embark and disembark.
 
 **stone wall**
 A wall segment built on a stone hex. Stone walls provide an enhanced defensive rating for the enclosing fort. See [Terrain Types](terrain-types.md).

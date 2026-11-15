@@ -13,7 +13,7 @@ Crew are your land-based units. They explore coastlines, build walls, and carry 
 
 **Movement:** Crew can move to any adjacent land hex (grassland, forest, or stone) that is not occupied by another crew member.
 
-**Boarding and leaving a ship:** Crew embark or disembark across the boundary between any land hex and an adjacent ocean hex. Both actions cost 1 AP.
+**Boarding and leaving a ship:** Crew embark or disembark across the boundary between any land hex and an adjacent ocean hex. Both are free: they cost no action points, so a crew member can still move after landing.
 
 **A ship needs crew to move.** A ship with no crew aboard cannot be moved.
 
@@ -49,17 +49,13 @@ To wake an anchored ship, click it.
 
 ---
 
-## Turn Queue
+## Ending Your Turn
 
-At the start of each turn, all units with available moves are placed in a queue. They are selected one at a time, with the camera panning to each unit automatically. You have three ways to manage a unit's place in the queue:
+Move your units, then press **Enter** or click the **End Turn** button in the bottom-right corner. Ending the turn shifts the wind, gives your ship a fresh movement budget, restores one action to each crew member who is free to act, advances wall construction, and updates what you can see.
 
-| Key | Effect |
-|---|---|
-| **Space** | Skip this unit for the rest of the turn |
-| **W** | Wait — move this unit to the end of the queue |
-| **F** | Encamp / Anchor — remove from the queue across all turns |
+You do not have to use every move; end the turn whenever you are ready. **Space** skips the selected unit for the rest of the turn and selects the next unit that can still act. When no such unit is left, Space ends the turn for you, so pressing Space repeatedly walks through your units and then moves on. **Tab** steps through units that can act, including ones you skipped. The status line at the bottom-left shows the turn number and how many crew are aboard.
 
-When all units have finished their moves, the turn ends automatically after a short pause. You can also end the turn early at any time with the **End Turn** button.
+**Planned:** the rest of the earlier turn queue: automatically selecting the first unit at the start of a turn, Wait (**W**), Encamp/Anchor (**F**), and a turn that ends automatically when nothing is left to do. These existed in the earlier browser version and are not yet in this one. See the [Keyboard Reference](../reference/keybindings.md).
 
 ---
 

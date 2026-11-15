@@ -33,7 +33,7 @@ This means you can build forts of any shape. A small tight ring is quick to buil
 
 ## Coastal Forts
 
-A fort that contains wall segments on land hexes adjacent to coast hexes is a **coastal fort**. Coastal forts can produce ships, which appear in the water next to the fort when ready.
+A fort that contains wall segments on land hexes adjacent to ocean hexes is a **coastal fort**. Coastal forts can produce ships, which appear in the water next to the fort when ready.
 
 Your own crew can board and leave ships at your coastal fort's shore — gates and ship-handling facilities are assumed. Enemy crew cannot disembark at your shore; the fort fires on them.
 
@@ -49,7 +49,7 @@ Enclosure unlocks the full capability set:
 
 **Crew production:** If a farm is within 3 hexes, the fort generates new crew over time.
 
-**Ship production:** If a logging camp is within 3 hexes and the fort has a wall hex adjacent to a coast hex, it generates new ships. Ships appear on an adjacent coast hex.
+**Ship production:** If a logging camp is within 3 hexes and the fort has a wall hex adjacent to an ocean hex, it generates new ships. Ships appear on an adjacent ocean hex.
 
 **Flag operations:** You can carry the captured enemy flag into an enclosed fort to win the game. You can also hide your own flag inside one for protection.
 

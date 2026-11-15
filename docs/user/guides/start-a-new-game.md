@@ -5,25 +5,24 @@ This guide explains how to start a new game of Windfall and what to expect in th
 
 ## Before You Begin
 
-Windfall runs in a modern desktop browser. No installation is required. Open the game page in Chrome, Firefox, Safari, or Edge on a laptop or desktop computer.
+Windfall is a desktop game built with Godot. Run the game from its project or exported build.
 
-A new game generates a unique world map. This takes a moment — expect up to 2 seconds after the page loads.
+A new game generates a unique world map. Each start picks a new random seed, which is printed to the console; the same seed always produces the same world and wind.
 
 ## Steps
 
-1. Open the Windfall page in your browser.
-2. Select **New Game** from the main menu.
-3. Wait for the world to generate. The map is created fresh for each game.
-4. The game begins. The world is black — entirely undiscovered. Your starting ship appears at the edge of your visible area, surrounded by a small patch of revealed ocean and coastline.
+1. Launch the game. There is no main menu yet; a new world is generated as the game starts.
+2. Wait a moment for the map to appear.
+3. The game begins. The world is black — entirely undiscovered. Your starting ship appears at the edge of your visible area, surrounded by a small patch of revealed ocean and coastline.
 
 ## Your Starting Position
 
 You begin with:
 - One ship
-- A crew of several members aboard the ship
+- A crew of three aboard the ship
 - One flag, carried by one of your crew
 
-Your opponent — the AI player — starts on the far side of the map with the same resources.
+Your opponent, the AI player, will start on the far side of the map with the same resources. (The AI opponent is not in the game yet.)
 
 ## What to Do First
 

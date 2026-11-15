@@ -33,19 +33,18 @@ You are the implementing agent. You write all application code, tests, and docum
 
 ## Code Constraints
 
-- **Pure HTML and JavaScript only.** No frameworks (no React, Vue, Svelte, etc.). No TypeScript. No build tools unless explicitly approved.
+- **Godot 4.7 and GDScript 4 only.** No third-party Godot plugins or addons unless explicitly approved.
 - **No external runtime dependencies** beyond what is explicitly listed in the architecture overview.
-- **CSS** may be authored directly; no preprocessors unless approved.
-- All source files live in `src/`. Entry point is `src/index.html`.
+- All game source files live in `godot/`. SVG terrain tiles live in `godot/tiles/`. SVG unit sprites live in `godot/sprites/`.
+- The project was originally specced for HTML/JS. That constraint is superseded. Do not reintroduce HTML or JavaScript code.
 
 ---
 
 ## Testing Constraints
 
 - Read `docs/internal/standards/testing.md` for the full testing standard.
-- Tests live in `tests/`. Mirror the `src/` structure.
+- GDScript unit tests use GUT or equivalent; test files live in `godot/tests/`.
 - All three test layers are required for any non-trivial feature: structural, behavioral, end-to-end.
-- Tests must be runnable without a build step. Use plain JS test runners or Playwright.
 
 ---
 
