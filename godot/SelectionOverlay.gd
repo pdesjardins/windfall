@@ -18,8 +18,13 @@ func update(active: bool, unit_world: Vector2, target_worlds: Array[Vector2], al
 func _draw() -> void:
 	if not _active:
 		return
+	var move_color := Color(0.91, 0.835, 0.69, 0.18)
+	# Staying put is a legal choice (clicking the unit's own hex deselects), so the current
+	# hex gets the same highlight as the destinations whenever there is something to choose.
+	if not _targets.is_empty() or not _alt_targets.is_empty():
+		_draw_hex(_unit_pos, move_color)
 	for target in _targets:
-		_draw_hex(target, Color(0.91, 0.835, 0.69, 0.18))
+		_draw_hex(target, move_color)
 	for target in _alt_targets:
 		_draw_hex(target, Color(0.5, 0.88, 0.6, 0.2))
 	draw_arc(_unit_pos, 18.0, 0.0, TAU, 32, Color("#e8d5b0"), 2.0)
