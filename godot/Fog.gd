@@ -17,7 +17,7 @@ func setup(width: int, height: int) -> void:
 	data.resize(width * height)
 
 
-func set_visible(col: int, row: int, sight_range: int, terrain_layer: TileMapLayer) -> void:
+func set_visible(col: int, row: int, sight_range: int) -> void:
 	var start := Vector2i(col, row)
 	var visited: Dictionary = {start: 0}
 	var queue: Array[Vector2i] = [start]
@@ -28,7 +28,7 @@ func set_visible(col: int, row: int, sight_range: int, terrain_layer: TileMapLay
 		data[cell.y * _width + cell.x] = VISIBLE
 
 		if dist < sight_range:
-			for neighbor: Vector2i in terrain_layer.get_surrounding_cells(cell):
+			for neighbor: Vector2i in HexGrid.neighbors(cell):
 				if not visited.has(neighbor) and _in_bounds(neighbor):
 					visited[neighbor] = dist + 1
 					queue.append(neighbor)

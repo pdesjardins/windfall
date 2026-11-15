@@ -1,10 +1,8 @@
 class_name CrewMarker
 extends Sprite2D
+## Visual for a CrewData. Main keeps position in sync with crew.map_pos.
 
-var map_pos: Vector2i = Vector2i.ZERO
-var ap_remaining: int = 1
-var building: bool = false
-var build_pos: Vector2i = Vector2i.ZERO
+var crew: CrewData
 
 
 func _ready() -> void:

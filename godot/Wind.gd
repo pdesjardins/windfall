@@ -7,13 +7,15 @@ const BLOCKED: int = -1
 # Indexed by steps from windward (0 = windward/blocked, 1 = close, 2 = broad, 3 = running)
 const AP_COSTS: Array[int] = [BLOCKED, 6, 3, 2]
 
+# Cumulative thresholds on a 0-99 roll: 20% no change, 30% each for +/-1, 7% each for +/-2,
+# 3% each for +/-3. Must match the spec and the original JS (src/js/engine/wind.js).
 const SHIFT_TABLE: Array = [
-	[40,  0],
-	[65,  1],
-	[90, -1],
-	[94,  2],
-	[98, -2],
-	[99,  3],
+	[20,  0],
+	[50,  1],
+	[80,  -1],
+	[87,  2],
+	[94,  -2],
+	[97,  3],
 	[100, -3],
 ]
 
