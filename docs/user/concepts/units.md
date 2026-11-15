@@ -13,7 +13,7 @@ Crew are your land-based units. They explore coastlines, build walls, and carry 
 
 **Movement:** Crew can move to any adjacent land hex (grassland, forest, or stone) that is not occupied by another crew member.
 
-**Boarding and leaving a ship:** Crew embark or disembark across the boundary between any land hex and an adjacent ocean hex. Both actions cost 1 AP.
+**Boarding and leaving a ship:** Crew embark or disembark across the boundary between any land hex and an adjacent ocean hex. Both are free: they cost no action points, so a crew member can still move after landing.
 
 **A ship needs crew to move.** A ship with no crew aboard cannot be moved.
 
