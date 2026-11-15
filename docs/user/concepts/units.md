@@ -53,9 +53,9 @@ To wake an anchored ship, click it.
 
 Move your units, then press **Enter** or click the **End Turn** button in the bottom-right corner. Ending the turn shifts the wind, gives your ship a fresh movement budget, restores one action to each crew member who is free to act, advances wall construction, and updates what you can see.
 
-You do not have to use every move; end the turn whenever you are ready. The status line at the bottom-left shows the turn number and how many crew are aboard.
+You do not have to use every move; end the turn whenever you are ready. **Space** skips the selected unit for the rest of the turn and selects the next unit that can still act. When no such unit is left, Space ends the turn for you, so pressing Space repeatedly walks through your units and then moves on. **Tab** steps through units that can act, including ones you skipped. The status line at the bottom-left shows the turn number and how many crew are aboard.
 
-**Planned:** a turn queue that selects each unit with moves left in turn, with Skip (**Space**), Wait (**W**) and Encamp/Anchor (**F**), and a turn that ends automatically when nothing is left to do. These existed in the earlier browser version and are not yet in this one. See the [Keyboard Reference](../reference/keybindings.md).
+**Planned:** the rest of the earlier turn queue: automatically selecting the first unit at the start of a turn, Wait (**W**), Encamp/Anchor (**F**), and a turn that ends automatically when nothing is left to do. These existed in the earlier browser version and are not yet in this one. See the [Keyboard Reference](../reference/keybindings.md).
 
 ---
 

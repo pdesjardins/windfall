@@ -17,7 +17,16 @@ var _crew_markers: Array[CrewMarker] = []
 var _wind_indicator: WindIndicator
 var _hud_label: Label
 
-var _ship_selected := false
+## What is selected: NONE, or a GameState.UnitKind. CREW_ABOARD is a crew member still on the
+## ship; its destinations are the land hexes it could disembark onto. Each selection shows
+## only that unit's own options.
+const NONE := -1
+
+# Placeholder selection badges (flashing letter by the unit); replace with real selection art.
+const BADGE_SHIP := "S"
+const BADGE_CREW := "C"
+
+var _sel: int = NONE
 var _selected_crew: CrewData = null
 var _valid_targets: Array[Vector2i] = []
 var _disembark_targets: Array[Vector2i] = []
@@ -52,6 +61,10 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif not event.ctrl_pressed and not event.shift_pressed:
 			if event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER:
 				_end_turn()
+			elif event.keycode == KEY_TAB:
+				_cycle_selection()
+			elif event.keycode == KEY_SPACE:
+				_skip_selected()
 			elif event.keycode == KEY_B:
 				_try_start_build()
 	elif event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
@@ -64,37 +77,46 @@ func _unhandled_input(event: InputEvent) -> void:
 func _handle_click(world_pos: Vector2) -> void:
 	var clicked := _terrain_layer().local_to_map(world_pos)
 
-	if _ship_selected:
-		if clicked in _valid_targets:
-			_move_ship(clicked)
+	match _sel:
+		GameState.UnitKind.SHIP:
+			if clicked in _valid_targets:
+				_move_ship(clicked)
 			_clear_selection()
-		elif clicked in _disembark_targets and state.crew_aboard > 0:
-			_disembark_crew(clicked)
-			_select_ship()
-		else:
-			_clear_selection()
-	elif _selected_crew != null:
-		if clicked in _valid_targets:
-			var unit := _selected_crew
-			state.move_crew(unit, clicked)
-			_sync_crew_marker(unit)
-			_render_fog()
-			if state.can_embark(unit):
-				_select_crew(unit)
+		GameState.UnitKind.CREW_ABOARD:
+			if clicked in _disembark_targets:
+				_disembark_crew(clicked)
+				# Keep going while more crew can still land.
+				if not _select_crew_aboard():
+					_clear_selection()
 			else:
 				_clear_selection()
-		elif clicked == state.ship_pos and state.can_embark(_selected_crew):
-			_embark_crew(_selected_crew)
-			_clear_selection()
+		GameState.UnitKind.CREW_LAND:
+			_click_with_land_crew(clicked)
+		NONE:
+			if clicked == state.ship_pos:
+				_select_ship_or_its_crew()
+			else:
+				for unit in state.crew:
+					if not unit.building and unit.map_pos == clicked:
+						_select_crew(unit)
+						break
+
+
+func _click_with_land_crew(clicked: Vector2i) -> void:
+	var unit := _selected_crew
+	if clicked in _valid_targets:
+		state.move_crew(unit, clicked)
+		_sync_crew_marker(unit)
+		_render_fog()
+		if state.can_embark(unit):
+			_select_crew(unit)
 		else:
 			_clear_selection()
-	elif clicked == state.ship_pos:
-		_select_ship()
+	elif clicked == state.ship_pos and state.can_embark(unit):
+		_embark_crew(unit)
+		_clear_selection()
 	else:
-		for unit in state.crew:
-			if not unit.building and unit.map_pos == clicked:
-				_select_crew(unit)
-				break
+		_clear_selection()
 
 
 func _move_ship(target: Vector2i) -> void:
@@ -148,7 +170,7 @@ func _embark_crew(unit: CrewData) -> void:
 # --- Selection ----------------------------------------------------------------------------
 
 func _clear_selection() -> void:
-	_ship_selected = false
+	_sel = NONE
 	_selected_crew = null
 	_valid_targets.clear()
 	_disembark_targets.clear()
@@ -156,23 +178,92 @@ func _clear_selection() -> void:
 
 
 func _select_ship() -> void:
-	var layer := _terrain_layer()
-	_ship_selected = true
+	_sel = GameState.UnitKind.SHIP
+	_selected_crew = null
+	_disembark_targets.clear()
 	_valid_targets.assign(state.ship_move_costs().keys())
-	_disembark_targets = state.disembark_targets()
-	_overlay.update(true, layer.map_to_local(state.ship_pos),
-			_to_world(_valid_targets), _to_world(_disembark_targets))
+	_overlay.update(true, _terrain_layer().map_to_local(state.ship_pos),
+			_to_world(_valid_targets), [], BADGE_SHIP)
+
+
+## Selects a crew member still aboard. Returns false (selecting nothing) if no one can land.
+func _select_crew_aboard() -> bool:
+	var targets := state.disembark_targets()
+	if state.crew_aboard == 0 or targets.is_empty():
+		return false
+	_sel = GameState.UnitKind.CREW_ABOARD
+	_selected_crew = null
+	_valid_targets.clear()
+	_disembark_targets = targets
+	_overlay.update(true, _terrain_layer().map_to_local(state.ship_pos),
+			[], _to_world(_disembark_targets), BADGE_CREW)
+	return true
+
+
+## Clicking the ship picks the ship, unless it has nowhere to go but its crew can land.
+func _select_ship_or_its_crew() -> void:
+	if state.ship_move_costs().is_empty() and _select_crew_aboard():
+		return
+	_select_ship()
 
 
 func _select_crew(unit: CrewData) -> void:
 	var layer := _terrain_layer()
+	_sel = GameState.UnitKind.CREW_LAND
 	_selected_crew = unit
+	_disembark_targets.clear()
 	_valid_targets = state.crew_targets(unit)
 	var embark_cells: Array[Vector2i] = []
 	if state.can_embark(unit):
 		embark_cells.append(state.ship_pos)
 	_overlay.update(true, layer.map_to_local(unit.map_pos),
-			_to_world(_valid_targets), _to_world(embark_cells))
+			_to_world(_valid_targets), _to_world(embark_cells), BADGE_CREW)
+
+
+## Tab: select the next unit that has something to do, including skipped ones.
+func _cycle_selection() -> void:
+	var candidates := state.unit_candidates(true)
+	if candidates.is_empty():
+		return
+	var next := 0
+	for i in candidates.size():
+		if _is_selected(candidates[i]):
+			next = (i + 1) % candidates.size()
+			break
+	_select_candidate(candidates[next])
+
+
+## Space: skip the selected unit and move on to the next one that has not been skipped.
+## When no such unit is left there is nothing more to do, so it ends the turn.
+func _skip_selected() -> void:
+	var all := state.unit_candidates(true)
+	var start := 0
+	if _sel != NONE:
+		state.skip_unit(_sel, _selected_crew)
+		for i in all.size():
+			if _is_selected(all[i]):
+				start = i + 1
+				break
+	for offset in all.size():
+		var entry := all[(start + offset) % all.size()]
+		if not state.is_skipped(entry["kind"], entry["crew"]):
+			_select_candidate(entry)
+			return
+	_end_turn()
+
+
+func _is_selected(entry: Dictionary) -> bool:
+	return entry["kind"] == _sel and entry["crew"] == _selected_crew
+
+
+func _select_candidate(entry: Dictionary) -> void:
+	match entry["kind"]:
+		GameState.UnitKind.SHIP:
+			_select_ship()
+		GameState.UnitKind.CREW_ABOARD:
+			_select_crew_aboard()
+		GameState.UnitKind.CREW_LAND:
+			_select_crew(entry["crew"])
 
 
 func _to_world(cells: Array[Vector2i]) -> Array[Vector2]:
@@ -314,7 +405,7 @@ func _setup_hud() -> void:
 
 
 func _update_hud() -> void:
-	_hud_label.text = "Turn %d   Crew aboard: %d\nEnter: end turn   B: build wall (crew selected)" \
+	_hud_label.text = "Turn %d   Crew aboard: %d\nTab: next unit   Space: skip unit   Enter: end turn   B: build wall (crew selected)" \
 			% [state.turn + 1, state.crew_aboard]
 
 

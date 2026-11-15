@@ -134,7 +134,7 @@ Held directly on `GameState` (a single ship; multiple ships arrive with producti
 | `ship_budget` | Movement points left this turn; reset to 6 by `end_turn()`; each hex deducts `Wind.move_cost()` |
 | `crew_aboard` | Crew count aboard (capacity 10); individual aboard crew are not tracked |
 
-`ship_move_costs()` runs a cost-bounded search over ocean cells using the wind-dependent per-step cost and returns every reachable cell with its total cost. `move_ship(target)` re-runs the search, deducts the cost, walks the cheapest route revealing fog at each hex, and sets the heading from the last step. Wind-blocked steps (cost `Wind.BLOCKED`) are never taken.
+`ship_move_costs()` runs a cost-bounded search over ocean cells using the wind-dependent per-step cost and returns every reachable cell with its total cost. `move_ship(target)` re-runs the search, deducts the cost, walks the cheapest route revealing fog at each hex, and sets the heading from the last step. Wind-blocked steps (cost `Wind.BLOCKED`) are never taken. A ship with `crew_aboard == 0` is inert: `ship_move_costs()` returns nothing and it is not offered by `unit_candidates`.
 
 ### Crew (`CrewData`)
 
@@ -147,7 +147,7 @@ Each crew unit on land is a `CrewData`:
 | `building` | `true` while constructing a wall |
 | `build_pos` | The hex under construction |
 
-Embarking and disembarking cost no AP. A building crew has 0 AP, cannot move, and is not selectable. When its wall completes it is freed and regains full AP that same turn. No other crew may enter a hex under construction. `CrewMarker` is a sprite holding a reference to its `CrewData`; `Main` keeps marker position in sync.
+Embarking and disembarking cost no AP. Disembarking may target any walkable cell next to the ship, including completed walls, but not a cell where another crew is building. A building crew has 0 AP, cannot move, and is not selectable. When its wall completes it is freed and regains full AP that same turn. No other crew may enter a hex under construction. `CrewMarker` is a sprite holding a reference to its `CrewData`; `Main` keeps marker position in sync.
 
 The JS fields `sleeping`, `shipId`, and `aboard` do not exist in the port; they return with the turn queue (encamp/anchor/unload) and multiple ships.
 
@@ -199,7 +199,7 @@ The hash function `Wind._wind_rng(seed, turn)` is a fast integer hash (not crypt
 
 ## Turn Structure
 
-The player acts in any order, then ends the turn with **Enter** or the End Turn button (both call `Main._end_turn()` → `GameState.end_turn()`). `Space` is intentionally unbound for ending turns; it is reserved for Skip when the queue returns.
+The player acts in any order, then ends the turn with **Enter** or the End Turn button (both call `Main._end_turn()` → `GameState.end_turn()`). `Space` skips the selected unit (`GameState.skip_unit`) and selects the next un-skipped candidate from `GameState.unit_candidates(false)`; if there is none it calls `_end_turn()`. Skip flags (`ship_skipped`, `aboard_skipped`, `CrewData.skipped`) are cleared by `end_turn()`.
 
 `GameState.end_turn()`, in order:
 
@@ -211,7 +211,7 @@ The player acts in any order, then ends the turn with **Enter** or the End Turn 
 
 `Main` then clears the selection and re-renders improvements, fort lines, fog, and the HUD.
 
-**Not yet ported from the JS design:** the `pendingUnits` turn queue with auto-select and camera pan, Skip/Wait/Encamp/Anchor/Unload, and automatic turn end when no unit has options. They are specified in the user docs as planned behavior. When added, queue logic belongs in `GameState` (which units are eligible) with only selection and camera motion in `Main`.
+**Not yet ported from the JS design:** automatic selection at turn start and camera pan, Wait/Encamp/Anchor/Unload, and automatic turn end when no unit has options (Skip exists, and ends the turn when it skips the last unit). They are specified in the user docs as planned behavior. When added, queue logic belongs in `GameState` (which units are eligible) with only selection and camera motion in `Main`.
 
 ---
 
@@ -305,12 +305,16 @@ Unit sprites are rotated to face their direction of travel; the ship's rotation 
 
 | Input | Action |
 |---|---|
-| Click unit | Select |
+| Click unit | Select (clicking the ship with no moves left selects its crew if they can land) |
+| `Tab` | Select next unit with options, including skipped ones (`unit_candidates(true)`) |
+| `Space` | Skip selected unit; ends the turn when no un-skipped unit has options |
 | Click highlighted hex | Move / disembark / embark |
 | `Enter`, numpad `Enter`, End Turn button | End turn |
 | `B` | Start a wall with the selected crew |
 | Right-drag, wheel | Pan, zoom |
 | `Ctrl+Shift+F` | Toggle fog (dev) |
+
+Selection is an enum in `Main` (`NONE`, `SHIP`, `CREW_ABOARD`, `CREW_LAND`); each kind shows only that unit's own destinations. `SelectionOverlay` draws a flashing placeholder badge ("S" ship, "C" crew) beside the selected unit; `update(..., badge)` is the hook to replace with real selection art. Which units are eligible (`unit_candidates`) and skip state live in `GameState` and are unit-tested; `Main` only maps a candidate to a selection.
 
 The user-facing reference is `docs/user/reference/keybindings.md`.
 

@@ -6,6 +6,9 @@ extends RefCounted
 ## Everything random derives from the single `game_seed`: terrain, starting wind, and the
 ## per-turn wind shifts, so a game is fully reproducible from (seed, turn).
 
+## Kinds of selectable unit. CREW_ABOARD is "a crew member still on the ship".
+enum UnitKind { SHIP, CREW_ABOARD, CREW_LAND }
+
 const TERRAIN_OCEAN := 0
 const TERRAIN_GRASSLAND := 1
 const TERRAIN_FOREST := 2
@@ -49,6 +52,10 @@ var ship_direction: int = 0
 var ship_budget: int = Wind.SHIP_MOVE_BUDGET
 var crew_aboard: int = 0
 var crew: Array[CrewData] = []
+
+# Skip flags for the ship and for the crew aboard (land crew carry their own flag).
+var ship_skipped := false
+var aboard_skipped := false
 
 
 ## A generated world with the ship placed and the starting crew aboard.
@@ -138,6 +145,9 @@ func move_ship(target: Vector2i) -> Array[Vector2i]:
 # Returns [costs, prev]: costs maps each reachable cell (excluding the start) to its total
 # cost; prev maps each cell to the cell the cheapest route reached it from.
 func _ship_search() -> Array:
+	# A ship with no crew aboard is inert: someone has to sail it.
+	if crew_aboard == 0:
+		return [{}, {}]
 	var dist: Dictionary = {ship_pos: 0}
 	var prev: Dictionary = {}
 	var queue: Array[Vector2i] = [ship_pos]
@@ -170,14 +180,15 @@ func _ship_search() -> Array:
 
 # --- Crew ---------------------------------------------------------------------------------
 
-## Land cells next to the ship where a crew member aboard could disembark.
+## Land cells next to the ship where a crew member aboard could disembark. Completed walls
+## are allowed (every wall is friendly for now; gates are assumed). A hex where someone is
+## mid-build is not: only one crew may occupy a construction site.
 func disembark_targets() -> Array[Vector2i]:
 	var targets: Array[Vector2i] = []
 	if crew_aboard == 0:
 		return targets
 	for neighbor in HexGrid.neighbors(ship_pos):
-		if in_bounds(neighbor) and is_walkable(neighbor) \
-				and improvement_at(neighbor) != IMPROVEMENT_WALL:
+		if in_bounds(neighbor) and is_walkable(neighbor) and not _has_builder_at(neighbor):
 			targets.append(neighbor)
 	return targets
 
@@ -256,14 +267,62 @@ func _is_under_construction_by_other(cell: Vector2i, unit: CrewData) -> bool:
 	return false
 
 
+func _has_builder_at(cell: Vector2i) -> bool:
+	return _is_under_construction_by_other(cell, null)
+
+
+# --- Unit queue --------------------------------------------------------------------------
+
+## Units that currently have something to do, in a stable order: ship, crew aboard, then each
+## land crew member. Each entry is {"kind": UnitKind, "crew": CrewData or null}. Skipped units
+## are included only when `include_skipped` is true (Tab visits them; Space does not).
+func unit_candidates(include_skipped: bool) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if (include_skipped or not ship_skipped) and not ship_move_costs().is_empty():
+		out.append({"kind": UnitKind.SHIP, "crew": null})
+	if (include_skipped or not aboard_skipped) and crew_aboard > 0 \
+			and not disembark_targets().is_empty():
+		out.append({"kind": UnitKind.CREW_ABOARD, "crew": null})
+	for unit in crew:
+		if unit.building or (unit.skipped and not include_skipped):
+			continue
+		if not crew_targets(unit).is_empty() or can_embark(unit):
+			out.append({"kind": UnitKind.CREW_LAND, "crew": unit})
+	return out
+
+
+## Passes over a unit for the rest of this turn. `unit` is only used for CREW_LAND.
+func skip_unit(kind: int, unit: CrewData) -> void:
+	match kind:
+		UnitKind.SHIP:
+			ship_skipped = true
+		UnitKind.CREW_ABOARD:
+			aboard_skipped = true
+		UnitKind.CREW_LAND:
+			if unit != null:
+				unit.skipped = true
+
+
+func is_skipped(kind: int, unit: CrewData) -> bool:
+	match kind:
+		UnitKind.SHIP:
+			return ship_skipped
+		UnitKind.CREW_ABOARD:
+			return aboard_skipped
+	return unit != null and unit.skipped
+
+
 # --- Turns --------------------------------------------------------------------------------
 
 func end_turn() -> void:
 	turn += 1
 	wind_dir = Wind.apply_shift(wind_dir, Wind.wind_shift(game_seed, turn))
 	ship_budget = Wind.SHIP_MOVE_BUDGET
+	ship_skipped = false
+	aboard_skipped = false
 
 	for unit in crew:
+		unit.skipped = false
 		if not unit.building:
 			unit.ap_remaining = CREW_AP_BUDGET
 			continue

@@ -6,3 +6,5 @@ var map_pos: Vector2i = Vector2i.ZERO
 var ap_remaining: int = 1
 var building: bool = false
 var build_pos: Vector2i = Vector2i.ZERO
+## Skipped for this turn: Space passed over this unit. Cleared when the turn ends.
+var skipped: bool = false

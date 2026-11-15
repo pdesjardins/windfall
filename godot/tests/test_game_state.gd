@@ -55,6 +55,7 @@ func test_ship_reach_follows_points_of_sail() -> void:
 	var s := blank()
 	s.wind_dir = 0
 	s.ship_pos = Vector2i(10, 10)
+	s.crew_aboard = 1
 	var costs := s.ship_move_costs()
 	var ahead := HexGrid.neighbors(s.ship_pos)[0]
 	check_eq(costs.get(ahead), 2, "running costs 2")
@@ -68,6 +69,7 @@ func test_ship_cannot_leave_ocean() -> void:
 	var s := blank()
 	s.wind_dir = 0
 	s.ship_pos = Vector2i(10, 10)
+	s.crew_aboard = 1
 	var land := HexGrid.neighbors(s.ship_pos)[0]
 	set_terrain(s, [land], GRASS)
 	check(not s.ship_move_costs().has(land), "land is not a ship destination")
@@ -78,6 +80,7 @@ func test_move_spends_budget_and_turns_ship() -> void:
 	var s := blank()
 	s.wind_dir = 0
 	s.ship_pos = Vector2i(10, 10)
+	s.crew_aboard = 1
 	var target := HexGrid.neighbors(s.ship_pos)[0]
 	var path := s.move_ship(target)
 	check_eq(path.size(), 1, "one step")
@@ -90,6 +93,7 @@ func test_multi_hex_move_reveals_fog_along_path() -> void:
 	var s := blank(30, 30)
 	s.wind_dir = 0
 	s.ship_pos = Vector2i(5, 5)
+	s.crew_aboard = 1
 	# Three running steps (cost 6) in a straight line; find the far end.
 	var far := s.ship_pos
 	for i in 3:
@@ -106,10 +110,41 @@ func test_ship_direction_updates_to_last_step_of_multi_hex_move() -> void:
 	var s := blank(30, 30)
 	s.wind_dir = 0
 	s.ship_pos = Vector2i(5, 5)
+	s.crew_aboard = 1
 	var step1 := HexGrid.neighbors(s.ship_pos)[0]
 	var step2 := HexGrid.neighbors(step1)[1] # broad reach: cost 3
 	s.move_ship(step2)
 	check_eq(s.ship_direction, 1, "direction of final step")
+
+
+func test_ship_with_no_crew_aboard_cannot_move() -> void:
+	var s := blank()
+	s.wind_dir = 0
+	s.ship_pos = Vector2i(10, 10)
+	s.crew_aboard = 0
+	check(s.ship_move_costs().is_empty(), "an uncrewed ship has no destinations")
+	check(s.move_ship(HexGrid.neighbors(s.ship_pos)[0]).is_empty(), "move rejected")
+	check_eq(s.ship_pos, Vector2i(10, 10), "ship stays put")
+	s.crew_aboard = 1
+	check(not s.ship_move_costs().is_empty(), "one crew member is enough")
+
+
+func test_ship_is_inert_once_the_last_crew_member_lands() -> void:
+	var s := _island_with_ship()
+	s.crew_aboard = 1
+	s.wind_dir = 0
+	check(not s.ship_move_costs().is_empty(), "sails while crewed")
+	s.disembark(HexGrid.neighbors(s.ship_pos)[0])
+	check(s.ship_move_costs().is_empty(), "inert after the last crew member lands")
+	var unit: CrewData = s.crew[0]
+	s.embark(unit)
+	check(not s.ship_move_costs().is_empty(), "sails again once someone is back aboard")
+
+
+func test_uncrewed_ship_is_not_a_candidate_for_selection() -> void:
+	var s := _queue_world()
+	s.crew_aboard = 0
+	check(not GameState.UnitKind.SHIP in _kinds(s.unit_candidates(true)), "no crew, no ship")
 
 
 # --- crew: embark / disembark -------------------------------------------------------------
@@ -140,6 +175,27 @@ func test_disembark_rejects_ocean_and_mountain() -> void:
 	check(s.disembark(around[1]) == null, "mountain rejected")
 	check(s.disembark(around[2]) == null, "ocean rejected")
 	check_eq(s.crew_aboard, 3, "nobody left the ship")
+
+
+func test_crew_may_disembark_onto_a_completed_friendly_wall() -> void:
+	# Spec: friendly forts allow embark/disembark across shore-adjacent walls (gates assumed).
+	var s := _island_with_ship()
+	var shore := HexGrid.neighbors(s.ship_pos)[0]
+	s.improvements[s.index_of(shore)] = GameState.IMPROVEMENT_WALL
+	check(shore in s.disembark_targets(), "wall hex is a disembark target")
+	check(s.disembark(shore) != null, "crew lands on the wall")
+
+
+func test_crew_cannot_disembark_onto_a_construction_site() -> void:
+	var s := _island_with_ship()
+	var shore := HexGrid.neighbors(s.ship_pos)[0]
+	var builder := add_crew(s, shore)
+	s.start_build(builder)
+	check(not shore in s.disembark_targets(), "someone is already building there")
+	check(s.disembark(shore) == null, "landing rejected")
+	s.end_turn()
+	s.end_turn()
+	check(shore in s.disembark_targets(), "open again once the wall is finished")
 
 
 func test_embark_returns_crew_to_ship() -> void:
@@ -319,3 +375,73 @@ func test_live_wall_reveals_surrounding_fog_at_turn_end() -> void:
 	check_eq(s.fog.data[s.index_of(center)], Fog.VISIBLE, "interior visible")
 	var far := HexGrid.neighbors(HexGrid.neighbors(HexGrid.neighbors(center)[0])[0])[0]
 	check_eq(s.fog.data[s.index_of(far)], Fog.UNDISCOVERED, "beyond wall sight range stays hidden")
+
+
+# --- unit queue / skip --------------------------------------------------------------------
+
+func _queue_world() -> GameState:
+	# Ship at (10,10) in open ocean with wind from a free direction, shore on direction 0,
+	# one land crew standing on a second land hex far from the ship.
+	var s := blank()
+	s.wind_dir = 0
+	s.ship_pos = Vector2i(10, 10)
+	s.crew_aboard = 2
+	set_terrain(s, [HexGrid.neighbors(s.ship_pos)[0], Vector2i(3, 3), Vector2i(3, 4)], GRASS)
+	return s
+
+
+func _kinds(entries: Array[Dictionary]) -> Array:
+	var kinds := []
+	for e in entries:
+		kinds.append(e["kind"])
+	return kinds
+
+
+func test_candidates_are_ship_then_aboard_then_land_crew() -> void:
+	var s := _queue_world()
+	add_crew(s, Vector2i(3, 3))
+	check_eq(_kinds(s.unit_candidates(true)),
+			[GameState.UnitKind.SHIP, GameState.UnitKind.CREW_ABOARD, GameState.UnitKind.CREW_LAND],
+			"order")
+
+
+func test_unit_with_no_options_is_not_a_candidate() -> void:
+	var s := _queue_world()
+	s.ship_budget = 0
+	check_eq(_kinds(s.unit_candidates(true)), [GameState.UnitKind.CREW_ABOARD],
+			"ship has no moves, aboard crew can land")
+	var spent := add_crew(s, Vector2i(3, 3))
+	spent.ap_remaining = 0
+	check(not GameState.UnitKind.CREW_LAND in _kinds(s.unit_candidates(true)),
+			"a spent crew with nothing to board has no options")
+
+
+func test_building_crew_is_not_a_candidate() -> void:
+	var s := _queue_world()
+	var builder := add_crew(s, Vector2i(3, 3))
+	s.start_build(builder)
+	check(not GameState.UnitKind.CREW_LAND in _kinds(s.unit_candidates(true)), "builders are busy")
+
+
+func test_skipped_units_are_hidden_unless_requested() -> void:
+	var s := _queue_world()
+	var walker := add_crew(s, Vector2i(3, 3))
+	s.skip_unit(GameState.UnitKind.SHIP, null)
+	check_eq(_kinds(s.unit_candidates(false)),
+			[GameState.UnitKind.CREW_ABOARD, GameState.UnitKind.CREW_LAND], "ship skipped")
+	check_eq(s.unit_candidates(true).size(), 3, "Tab still reaches the skipped ship")
+	s.skip_unit(GameState.UnitKind.CREW_ABOARD, null)
+	s.skip_unit(GameState.UnitKind.CREW_LAND, walker)
+	check(s.unit_candidates(false).is_empty(), "everything skipped: nothing left")
+	check(s.is_skipped(GameState.UnitKind.CREW_LAND, walker), "flag readable")
+
+
+func test_skip_clears_when_the_turn_ends() -> void:
+	var s := _queue_world()
+	var walker := add_crew(s, Vector2i(3, 3))
+	s.skip_unit(GameState.UnitKind.SHIP, null)
+	s.skip_unit(GameState.UnitKind.CREW_ABOARD, null)
+	s.skip_unit(GameState.UnitKind.CREW_LAND, walker)
+	s.end_turn()
+	check(not s.ship_skipped and not s.aboard_skipped and not walker.skipped, "all flags reset")
+	check_eq(s.unit_candidates(false).size(), 3, "everyone is back in the queue")

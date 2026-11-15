@@ -3,9 +3,9 @@
 
 ## Overview
 
-Windfall is a turn-based nautical strategy game playable in a modern desktop browser with no installation required. The player commands a ship and crew, explores a procedurally generated world of land and ocean, builds walls, and competes against an AI opponent in a capture-the-flag scenario.
+Windfall is a turn-based nautical strategy game for the desktop, built with Godot (it began as a browser game; see the port note under Platform). The player commands a ship and crew, explores a procedurally generated world of land and ocean, builds walls, and competes against an AI opponent in a capture-the-flag scenario.
 
-The game is free to play. It is distributed as a static website. No account, server, or internet connection is required after the initial page load.
+The game is free to play. No account, server, or internet connection is required.
 
 ### Narrative Premise
 
@@ -153,7 +153,7 @@ All ships are identical. A ship retains full capability until destroyed — ther
 **Hit points:** Multi-hit (TBD value). Ships absorb multiple cannon hits before being destroyed.
 
 **Capabilities:**
-- Navigate ocean hexes (1 AP per hex)
+- Navigate ocean hexes (cost per hex set by the wind; see Wind)
 - Transport crew (capacity: 10 crew)
 - Fire cannons at adjacent enemy units (1 AP; range 1 hex; see Combat)
 - Deploy crew to an adjacent shore-adjacent land hex (free action)
@@ -185,7 +185,6 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 | Forest | Logging Camp **or** Wall |
 | Stone | Wall only |
 | Mountain | Natural wall — no improvement required or possible |
-| Coast | None (water hex) |
 | Ocean | None (water hex) |
 
 ### Construction
@@ -194,11 +193,11 @@ A wall segment is an improvement applied to a land hex. Each hex may hold exactl
 2. Building status locks the crew to that hex for 3 consecutive turns: the turn building begins plus 2 turns in which the crew skips all other actions. The crew cannot move, embark, improve terrain, or perform any other action while building.
 3. During construction, the hex shows a visual stage indicator: a dashed outline at WALL_1 and a semi-opaque fill at WALL_2. These stages are visual feedback only — they do not fire cannons, do not contribute to fort-loop detection, and satisfy no wall condition. After all 3 turns complete, the hex becomes a full **wall** improvement.
 4. If the building crew is destroyed during construction, the work is abandoned. No partial improvement is left on the hex.
-5. Only one crew unit may build on a given hex at a time.
+5. Only one crew unit may build on a given hex at a time; no other crew may enter a hex while a wall is under construction on it. When the third turn completes the wall, the builder is free again and regains their full action that same turn.
 6. The crew unit may then move to an adjacent hex and repeat.
 7. When a contiguous chain of wall hexes (plus mountain hexes) forms a **closed loop connected to itself**, all hexes enclosed by that loop become the interior of a **live fort**.
 
-Mountain hexes participate as natural wall segments without requiring any improvement. Detection uses an outside-in flood fill: starting from all ocean hexes and map-boundary open hexes, the engine fills inward through non-wall non-mountain terrain. Any land hex that cannot be reached is enclosed. If the enclosing boundary includes at least one complete player wall, all walls connected to that boundary — including dead-end spurs — are marked live in `game.liveWalls`. Detection runs at the end of each turn. Interior hexes are not separately tracked in the current implementation.
+Mountain hexes participate as natural wall segments without requiring any improvement. Detection uses an outside-in flood fill: starting from all ocean hexes and map-boundary open hexes, the engine fills inward through non-wall non-mountain terrain. Any land hex that cannot be reached is enclosed. If the enclosing boundary includes at least one complete player wall, all walls connected to that boundary — including dead-end spurs — are marked live (`GameState.live_walls`). Detection runs at the end of each turn. Interior hexes are not separately tracked in the current implementation.
 
 ### Embarkation at Fortified Shore
 
@@ -220,10 +219,9 @@ When wall hexes form a closed loop, the enclosed interior becomes a live fort, u
 | Fire cannons (auto) | End of player turn; all wall segments fire at adjacent enemies |
 | Generate crew | Farm within 3 hexes |
 | Generate ships | Logging camp within 3 hexes AND a shore-adjacent wall hex exists |
-| Accept captured flag (win) | Carrier enters any friendly enclosed fort |
 | Store hidden flag | Owner places flag in any friendly wall hex or interior |
 
-When a ship is generated, it appears on an adjacent coast hex.
+When a ship is generated, it appears on an adjacent ocean hex.
 
 ### Wall Segment Hit Points
 
@@ -287,7 +285,7 @@ The initial AI is intentionally simple. Sophistication will increase in later it
 
 **Phase 2 — Expansion:**
 - AI allocates crew and ships on a fixed turn schedule (TBD).
-- AI builds walls near favorable terrain (stone, coast, grassland, forest).
+- AI builds walls near favorable terrain (stone, grassland, forest, preferring shoreline sites).
 - AI moves ships to explore the map.
 
 **Phase 3 — Aggression:**
@@ -342,7 +340,7 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 1. **Human turn:** The player takes all actions for their units. When satisfied, the player ends their turn.
 2. **AI turn:** The AI takes all actions for its units. When complete, the next human turn begins.
 
-**Ending the turn.** The player ends their turn with the **Enter** key (or numpad Enter) or the **End Turn** button at the bottom-right of the screen. Ending the turn: increments the turn counter, applies the wind shift, resets the ship's movement budget to 6, restores 1 AP to every crew unit that is not building, advances wall construction one stage, re-runs fort detection, and refreshes fog. `Space` is deliberately **not** an end-turn key: in the user documentation it means "skip this unit" (see Implementation Status).
+**Ending the turn.** The player ends their turn with the **Enter** key (or numpad Enter) or the **End Turn** button at the bottom-right of the screen. Ending the turn: increments the turn counter, applies the wind shift, resets the ship's movement budget to 6, restores 1 AP to every crew unit that is not building, advances wall construction one stage, re-runs fort detection, and refreshes fog. **Space** skips the selected unit for the rest of the turn; when no unit that has options remains un-skipped, Space ends the turn instead (see Controls and Interface).
 
 **Action points:** Crew receive 1 AP per turn. Ships receive a movement budget of 6 points per turn; usable distance varies by direction relative to wind (see Wind section).
 
@@ -354,10 +352,14 @@ Windfall uses a sequential turn structure modeled on early Civilization.
 
 Play is mouse-driven with a few keys. Left-click selects; there is no separate "move" command.
 
-1. **Select** a unit by clicking it: the ship, or a land crew member. A ring appears around the selected unit.
+1. **Select** a unit by clicking it: the ship, or a land crew member. A ring appears around the selected unit, and a flashing letter beside it says what kind of unit it is: **S** for the ship, **C** for a crew member. (The letters are a placeholder hook for real selection art; the same badge is used for crew aboard the ship and crew on land.)
+   - **Crew aboard the ship are selectable on their own.** They show **C** at the ship's hex and highlight the adjacent land hexes where one can disembark.
+   - Clicking the ship selects the ship; if the ship has no moves left but crew aboard could land, it selects the crew aboard instead.
+   - **Tab** selects the next unit that has something to do: the ship (if it can move), then crew aboard (if one can land), then each land crew member who can move or embark. Tab also visits units you have skipped.
+   - **Space** skips the selected unit for this turn and selects the next unit that has options and has not been skipped. If none is left, Space **ends the turn**. With nothing selected, Space selects the first such unit (or ends the turn if there is none). Skips are cleared when the turn ends. Skipping only affects Space and Tab; clicking a skipped unit still selects it.
 2. **Destinations are highlighted** in a light tan tint. For the ship these are **every ocean hex reachable this turn**, found by a wind-cost search over the remaining movement budget (so one click can move the ship several hexes). For crew these are the adjacent walkable hexes while the crew has AP.
 3. **The unit's own hex is highlighted the same way** whenever it has any option, because staying put is a legal choice. Clicking the own hex, or any hex that is not a destination, deselects without spending anything.
-4. **Boarding actions are highlighted green.** With the ship selected and crew aboard, adjacent land hexes where a crew member can disembark are green; clicking one lands one crew member and keeps the ship selected so more can follow. With a crew member selected next to their ship, the ship's hex is green; clicking it embarks the crew. After a crew move that ends next to the ship, the crew stays selected so embarking is one more click.
+4. **Boarding actions are highlighted green.** With a crew member aboard selected, adjacent land hexes where they can disembark are green; clicking one lands one crew member and keeps the aboard-crew selection active so more can follow. With a land crew member selected next to their ship, the ship's hex is green; clicking it embarks the crew. The ship selection itself shows only the ship's own movement. After a crew move that ends next to the ship, the crew stays selected so embarking is one more click.
 5. **A spent unit shows no destinations.** A ship with no budget or a crew member with 0 AP shows only the selection ring.
 6. Crew that are building a wall cannot be selected, and no other crew may step onto a hex where a wall is under construction.
 
@@ -366,6 +368,8 @@ Play is mouse-driven with a few keys. Left-click selects; there is no separate "
 | Input | Action |
 |---|---|
 | Left-click | Select a unit / choose a highlighted destination |
+| `Tab` | Select the next unit that has something to do (including skipped ones) |
+| `Space` | Skip the selected unit; ends the turn when no un-skipped unit has options left |
 | `Enter` / numpad `Enter` | End the turn |
 | End Turn button | End the turn |
 | `B` | With a crew unit selected, start building a wall on its hex immediately (no menu) |
@@ -376,23 +380,24 @@ Play is mouse-driven with a few keys. Left-click selects; there is no separate "
 ### Heads-Up Display
 
 - **Wind indicator** (top-left): arrow pointing at the direction the wind comes from, with the ship's remaining movement budget (`AP: n`).
-- **Status line** (bottom-left): current turn number, crew aboard the ship, and key hints.
+- **Status line** (bottom-left): current turn number, crew aboard the ship, and key hints (Tab, Space, Enter, B).
 - **End Turn button** (bottom-right). It never takes keyboard focus, so key presses always reach the game.
 
 ---
 
 ## Implementation Status (Godot Port)
 
-The behavior above this section is specified for the finished game. As of 2026-11-14 the Godot port implements: map generation, fog of war, ship movement under wind, crew disembark/embark/movement, wall construction and fort detection, and the controls above. Not yet ported or built:
+The behavior above this section is specified for the finished game. As of 2026-11-15 the Godot port implements: map generation, fog of war, ship movement under wind, crew disembark/embark/movement, wall construction and fort detection, and the controls above. Not yet ported or built:
 
 | Feature | State |
 |---|---|
-| Turn queue, auto-select, auto-end of turn, Skip (`Space`), Wait (`W`), Encamp/Anchor (`F`), Unload (`U`) | Existed in the JS version; not ported. Until the queue exists, crew and ship are selected by clicking and the player ends the turn manually. |
+| Turn queue extras: automatic selection of the first unit at turn start, camera pan to the selected unit, automatic end of turn, Wait (`W`), Encamp/Anchor (`F`), Unload (`U`) | Existed in the JS version; not ported. Skip (`Space`) and Tab selection exist; the player still starts the turn by selecting a unit and ends it manually or by skipping the last unit. |
 | Save and resume | Existed in the JS version; not ported |
 | Farms and logging camps | Existed in the JS version; not ported |
 | Volcanic scatter terrain pass, opposite-side starting positions | Specified; not implemented |
 | Flags, win/loss, AI opponent, combat, ship/crew production, wall HP | Specified; not implemented in either version |
 | On-screen text panels and localization | JS had them; Godot has only the HUD above |
+| Ship names (*Resolution*, *Accord*, the name pool) | Specified; the Godot port shows no ship names |
 
 ---
 
@@ -400,7 +405,7 @@ The behavior above this section is specified for the finished game. As of 2026-1
 
 **Saving:** The player may save at any time during their turn. The game state serializes to a JSON file (`windfall-save.json`). In the original browser version it downloaded to the player's device; in the Godot port it will be written through a file dialog. The seed, turn count, and unit/improvement state are sufficient to rebuild terrain and wind.
 
-**Loading:** On the main page, the player may load a save file. The game restores to the exact state at the time of saving.
+**Loading:** The player may load a save file. The game restores to the exact state at the time of saving.
 
 **Save file versioning:** The save file includes a `version` field. Incompatible save file versions display a clear error message and do not attempt to load.
 
@@ -410,8 +415,8 @@ The behavior above this section is specified for the finished game. As of 2026-1
 
 | Condition | Result |
 |---|---|
-| Player's crew delivers captured AI flag to a player fort | Player wins |
-| AI's crew delivers captured player flag to an AI fort | Player loses |
+| Player's crew carries the captured AI flag onto the hex holding the player's own flag, and the player's flag is not captured | Player wins |
+| AI's crew carries the captured player flag onto the hex holding the AI's own flag | Player loses |
 | Player's crew carrying enemy flag is destroyed | Player loses immediately |
 
 ---
@@ -431,12 +436,12 @@ The behavior above this section is specified for the finished game. As of 2026-1
 | 2026-04-18 | Collapsed "plains" and "farmland" into "grassland" | Simpler and more consistent — Forest→Logging Camp and Grassland→Farm follow the same pattern; separate "farmland" type was redundant |
 | 2026-04-18 | Elevation discarded after terrain classification | A 2D hex grid cannot meaningfully depict inter-hex elevation differences; terrain type carries all visual and strategic meaning; mountains signal impassable high terrain without runtime elevation data |
 | 2026-04-18 | Wall is a hex improvement, not a placed unit | Consistent with farm/logging camp model; one improvement per hex; stone walls give defensive bonus from the material, not adjacency |
-| 2026-04-18 | Fort goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop |
-| 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary |
+| 2026-04-18 | Fort goes live on closed loop, not flood-fill enclosure | Cleaner detection model; mountains and walls form a ring; interior follows from the loop. *Superseded in practice: detection uses an outside-in flood fill (see Forts → Construction).* |
+| 2026-04-18 | Coast is a water hex; embarkation is a land-to-coast boundary crossing | Corrects prior misuse of "coastal hex" as a land type; ships appear on coast, crew cross the boundary. *Superseded 2026-04-19: the coast terrain type was removed; embarkation is between land and any adjacent ocean hex.* |
 | 2026-04-18 | Friendly forts allow embarkation at shore-adjacent wall hexes | Gates are assumed; enemy forts fire on approaching units and block disembarkation |
-| 2026-04-19 | Map size 300×200 (60,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs |
-| 2026-04-19 | Wind system with points of sail (1–3 AP) | Authentic nautical mechanic; creates meaningful directional decisions without simulation complexity |
-| 2026-04-19 | In irons: 1 AP attack-only, no upwind movement | Ships can always return fire; cannot exploit wind to move upwind |
+| 2026-04-19 | Map size 300×200 (60,000 hexes) | Viewport culling makes this performant; large map supports long exploration arcs. *Design target; development uses 80×50 (2026-10-17).* |
+| 2026-04-19 | Wind system with points of sail (1–3 AP) | Authentic nautical mechanic; creates meaningful directional decisions without simulation complexity. *Superseded 2026-04-22 by the 6-point movement budget.* |
+| 2026-04-19 | In irons: 1 AP attack-only, no upwind movement | Ships can always return fire; cannot exploit wind to move upwind. *Superseded 2026-04-22: in irons blocks only the windward hex.* |
 | 2026-04-19 | Two-tier fort: wall fires immediately, enclosure unlocks production | Any wall hex is tactically useful; enclosure rewards sustained building effort |
 | 2026-04-19 | Attack is implicit movement, no explicit attack command | Simplifies controls; moving onto enemy hex = attack; unified model for all unit types |
 | 2026-04-19 | Cannon range = 1 hex, constant | Simple and consistent; no range tracking required |
@@ -470,6 +475,10 @@ The behavior above this section is specified for the finished game. As of 2026-1
 | 2026-11-14 | A crew member who completes a wall regains their AP on the turn it completes | Previously they sat idle one extra turn; the JS engine restored AP on completion. |
 | 2026-11-14 | No crew may enter a hex where a wall is under construction | Enforces "one builder per hex" for stacking-friendly friendly crew movement. |
 | 2026-11-14 | Ship fog reveal covers the whole route of a multi-hex move | One click now moves several hexes; revealing only the destination skipped terrain the ship sailed past. |
-| 2026-11-14 | Enter and an on-screen End Turn button end the turn; `Space` does not | `Space` means "skip unit" in the documented queue controls. Manual ending is a stopgap until the turn queue and auto-end are ported. |
+| 2026-11-14 | Enter and an on-screen End Turn button end the turn; `Space` does not end it directly | `Space` means "skip unit" in the documented queue controls. (Refined later the same day: Space skips, and ends the turn only when it skips the last unit with options.) |
 | 2026-11-14 | Selected unit's own hex is highlighted like a destination | Not moving is a valid option; leaving the hex unhighlighted made the options look inconsistent. |
 | 2026-11-14 | Game rules extracted into scene-free `GameState` (with `HexGrid`, `CrewData`) | Makes rules testable headless and keeps `Main` to rendering and input; groundwork for save/load and the AI. |
+| 2026-11-14 | Crew aboard the ship are a separate selection (badge C) from the ship (badge S); Tab cycles units with options | It was unclear whether a selection was the ship or a crew member, and aboard crew could only land through the ship's selection. Until the turn queue exists, Tab is the lightweight way to reach each unit. |
+| 2026-11-14 | Space skips the selected unit and ends the turn when no un-skipped unit has options left | Restores the documented meaning of Space (skip) while giving the player a one-key way through the turn: skip until nothing is left, and the turn ends. The "nothing left" check ignores skipped units, since they were deliberately passed over. Tab still visits skipped units so a mistaken skip is recoverable without the mouse. |
+| 2026-11-15 | A ship with no crew aboard cannot move (restored) | The Godot port had dropped the JS rule, so a ship kept sailing after its last crew member landed. The ship is also not selectable by Tab/Space while uncrewed; it sails again as soon as someone re-embarks. |
+| 2026-11-15 | Crew may disembark onto completed friendly walls; not onto a hex where someone is building | The Godot port had excluded every completed wall, contradicting "gates are assumed" for friendly forts (Embarkation at Fortified Shore). A hex under construction stays closed, matching the one-builder-per-hex rule. Enemy-wall blocking arrives with the AI and wall ownership. |
